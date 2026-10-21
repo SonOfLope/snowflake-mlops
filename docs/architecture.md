@@ -20,7 +20,7 @@ Under that role the stage runs the same six steps (B2): `snow dcm deploy` for th
 
 ## C1 and C2, promotion
 
-Test receives the exact version dev logged, by `CREATE MODEL ... FROM MODEL` across databases (C1), through the `USAGE` its deployer holds on dev's models. Prod does the same from test and sets the version as the default (C2), which is what production code calls. A rerun with a version already present is a no-op.
+Test receives the exact version dev logged, by `CREATE MODEL ... FROM MODEL` across databases (C1), through the `USAGE` and `READ` its deployer holds on dev's models (`MODELS_R` of the previous environment; the copy reads the model's artifacts, which `USAGE` alone does not allow). Prod does the same from test and sets the version as the default (C2), which is what production code calls. A rerun with a version already present is a no-op.
 
 ## D1, the data
 
