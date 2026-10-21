@@ -54,7 +54,8 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
-        for d in src jobs config; do
+        # the package directory itself, not src/, which also holds the egg-info the editable install writes
+        for d in src/luckml jobs config; do
           snow stage copy "${CONN[@]}" $d @${{ parameters.db }}.WORKSPACE.CODE/$(Build.BuildId)/$d --recursive --overwrite
         done
   - ${{ if eq(parameters.isDev, true) }}:

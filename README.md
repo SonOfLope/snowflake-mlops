@@ -43,7 +43,7 @@ export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
 (cd dcm && snow dcm plan -c <name> --target dev)
 (cd features && snow feature plan -c <name> --database DEV_ML_DB --schema FEATURES --target dev)
 
-for d in src jobs config; do snow stage copy -c <name> $d @DEV_ML_DB.WORKSPACE.CODE/local/$d --recursive --overwrite; done
+for d in src/luckml jobs config; do snow stage copy -c <name> $d @DEV_ML_DB.WORKSPACE.CODE/local/$d --recursive --overwrite; done
 .venv/bin/python -m luckml.submit --env dev --job train --version VLOCAL --run-id local --build-dir local
 .venv/bin/python -m luckml.submit --env dev --job forecast --version VLOCAL --run-id local --build-dir local
 ```
