@@ -8,3 +8,4 @@ features/out/
 .pytest_cache/
 .ruff_cache/
 features/manifest.yml
+dcm/manifest.yml

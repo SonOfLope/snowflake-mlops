@@ -28,8 +28,8 @@ stages:
               user: SVC_MLOPS_DEV
               role: RBAC_ML_DEPLOYER_DEV
               script: |
-                (cd dcm && snow dcm plan "${CONN[@]}" --target dev)
                 scripts/render_manifest.sh
+                (cd dcm && snow dcm plan "${CONN[@]}" --target dev)
                 (cd features && snow feature plan "${CONN[@]}" --database DEV_ML_DB --schema FEATURES --target dev)
 
   # A pull request validation run (branch policy) stops after Validate; main continues.

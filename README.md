@@ -21,7 +21,7 @@ azure-pipelines.yml            Validate, Dev, Test, Prod (approval)
 pipelines/templates/           tools.yml (Python environment), snow-step.yml (signed-in step), deploy-env.yml (the six steps per environment)
 src/luckml/                    config, session, data, features, model, registry, forecast, submit
 jobs/                          train.py and forecast.py, the ML Job entry points
-dcm/                           DCM project: WORKSPACE view, tables and stage, one target per environment
+dcm/                           DCM project: WORKSPACE view, tables and stage, one target per environment (manifest rendered from its template)
 features/                      declarative feature store: SITE entity, SITE_MONTH_LAGS source, SITE_MONTHLY_TONNES view
 config/                        dev.yml, test.yml, prod.yml
 scripts/                       promote.sql, set_default.sql, monitor.sql, verify.sql, render_manifest.sh
@@ -40,8 +40,9 @@ export SNOWFLAKE_CONNECTION_NAME=<name> SNOWFLAKE_ACCOUNT=<org>-<account>
 export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
 
 .venv/bin/pytest -q && .venv/bin/ruff check .
+scripts/render_manifest.sh                # dcm/manifest.yml and features/manifest.yml from their templates
 (cd dcm && snow dcm plan -c <name> --target dev)
-scripts/render_manifest.sh && (cd features && snow feature plan -c <name> --database DEV_ML_DB --schema FEATURES --target dev)
+(cd features && snow feature plan -c <name> --database DEV_ML_DB --schema FEATURES --target dev)
 
 for d in src jobs config; do snow stage copy -c <name> $d @DEV_ML_DB.WORKSPACE.CODE/local/$d --recursive --overwrite; done
 .venv/bin/python -m luckml.submit --env dev --job train --version VLOCAL --run-id local --build-dir local

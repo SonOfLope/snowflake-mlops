@@ -28,6 +28,7 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
+        scripts/render_manifest.sh
         cd dcm
         snow dcm create "${CONN[@]}" --target ${{ parameters.env }} --if-not-exists
         snow dcm plan "${CONN[@]}" --target ${{ parameters.env }}
@@ -39,7 +40,6 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
-        scripts/render_manifest.sh
         FS=(--database ${{ parameters.db }} --schema FEATURES --target ${{ parameters.env }})
         # init marks the schema as a feature store the first time; it writes only into a scratch directory
         (cd "$(mktemp -d)" && cp "$(Build.SourcesDirectory)/features/manifest.yml" . && snow feature init "${CONN[@]}" "${FS[@]}" >/dev/null)
