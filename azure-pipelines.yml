@@ -54,11 +54,11 @@ stages:
   - stage: Test
     dependsOn: Dev
     condition: succeeded()
-    variables:
-      modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
     jobs:
       - deployment: test
         environment: LuckData-Snowflake-MLOps-test
+        variables:
+          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
@@ -75,11 +75,11 @@ stages:
   - stage: Prod
     dependsOn: Test
     condition: succeeded()
-    variables:
-      modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
     jobs:
       - deployment: prod
         environment: LuckData-Snowflake-MLOps-prod
+        variables:
+          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
