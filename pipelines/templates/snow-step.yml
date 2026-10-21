@@ -19,6 +19,7 @@ parameters:
 steps:
   - task: AzureCLI@2
     displayName: ${{ parameters.displayName }}
+    retryCountOnTaskFailure: 1
     ${{ if ne(parameters.name, '') }}:
       name: ${{ parameters.name }}
     inputs:
