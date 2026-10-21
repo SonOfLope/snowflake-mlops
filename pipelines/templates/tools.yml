@@ -1,0 +1,24 @@
+parameters:
+  - name: pythonVersion
+    type: string
+    default: '3.12'
+
+# One virtual environment per requirements.txt content, kept in the agent's tools directory, so a run installs
+# nothing when the pins have not changed. python3 on the agent must be the version in pythonVersion.
+steps:
+  - bash: |
+      set -euo pipefail
+      python3 --version | grep -q "Python ${{ parameters.pythonVersion }}" || { echo "python3 is not ${{ parameters.pythonVersion }}"; exit 1; }
+      key=$(sha256sum requirements-dev.txt | cut -c1-16)
+      dest="$AGENT_TOOLSDIRECTORY/luckml/$key"
+      if [[ ! -x "$dest/bin/python" ]]; then
+        python3 -m venv "$dest"
+        for attempt in 1 2 3; do
+          "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt && break
+          [[ $attempt -eq 3 ]] && exit 1; echo "pip attempt $attempt failed, retrying"; sleep 15
+        done
+      fi
+      "$dest/bin/pip" install --quiet --disable-pip-version-check --no-deps -e .
+      echo "##vso[task.prependpath]$dest/bin"
+      "$dest/bin/snow" --version
+    displayName: Python environment and Snowflake CLI

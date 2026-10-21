@@ -1,0 +1,6 @@
+kind: Entity
+name: SITE
+description: A Luck Stone site, keyed by its site id.
+join_keys:
+  - name: SITE_ID
+    type: StringType

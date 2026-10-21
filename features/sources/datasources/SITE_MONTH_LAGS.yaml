@@ -1,0 +1,19 @@
+kind: BatchSource
+name: SITE_MONTH_LAGS
+description: Monthly tonnes per site with the three previous months and the month number, from WORKSPACE.SRC_SITE_MONTH.
+query_file: SITE_MONTH_LAGS.sql
+columns:
+  - name: SITE_ID
+    type: NUMBER
+  - name: MONTH
+    type: TIMESTAMP_NTZ
+  - name: TONNES
+    type: FLOAT
+  - name: LAG_1
+    type: FLOAT
+  - name: LAG_2
+    type: FLOAT
+  - name: LAG_3
+    type: FLOAT
+  - name: MONTH_NUM
+    type: NUMBER

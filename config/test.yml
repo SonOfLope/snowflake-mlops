@@ -1,0 +1,12 @@
+env: test
+database: TEST_ML_DB
+source_database: TEST_DB
+warehouse: ML_WH
+compute_pool: ML_CPU_POOL
+role: RBAC_ML_DEPLOYER_TEST
+model_name: SITE_TONNES_FORECAST
+feature_view: SITE_MONTHLY_TONNES
+feature_view_version: "1"
+gate_mape_max: 0.35
+horizon_months: 3
+eval_months: 3

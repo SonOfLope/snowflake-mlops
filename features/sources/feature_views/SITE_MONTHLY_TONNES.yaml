@@ -1,0 +1,24 @@
+kind: BatchFeatureView
+name: SITE_MONTHLY_TONNES
+version: "1"
+description: Monthly tonnes per site with lags 1 to 3 and the month number. Refreshed daily.
+entities:
+  - SITE
+sources:
+  - name: SITE_MONTH_LAGS
+    source_type: BATCH
+timestamp_col: MONTH
+refresh_freq: 1 day
+warehouse: ML_WH
+offline: true
+features:
+  - source_column: {name: TONNES, type: FLOAT}
+    output_column: {name: TONNES, type: FLOAT}
+  - source_column: {name: LAG_1, type: FLOAT}
+    output_column: {name: LAG_1, type: FLOAT}
+  - source_column: {name: LAG_2, type: FLOAT}
+    output_column: {name: LAG_2, type: FLOAT}
+  - source_column: {name: LAG_3, type: FLOAT}
+    output_column: {name: LAG_3, type: FLOAT}
+  - source_column: {name: MONTH_NUM, type: NUMBER}
+    output_column: {name: MONTH_NUM, type: NUMBER}

@@ -1,0 +1,107 @@
+parameters:
+  - name: env
+    type: string
+  - name: db
+    type: string
+  - name: previousDb
+    type: string
+    default: ''
+  - name: serviceConnection
+    type: string
+  - name: modelVersion
+    type: string
+  - name: isDev
+    type: boolean
+    default: false
+  - name: isProd
+    type: boolean
+    default: false
+
+# One environment, six steps: schema objects, feature views, code to the stage, the version (trained in dev,
+# copied from the previous environment elsewhere), the forecast, then verify and monitor.
+steps:
+  - template: tools.yml
+  - template: snow-step.yml
+    parameters:
+      displayName: DCM plan and deploy (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        cd dcm
+        snow dcm create "${CONN[@]}" --target ${{ parameters.env }} --if-not-exists
+        snow dcm plan "${CONN[@]}" --target ${{ parameters.env }}
+        snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber)"
+  - template: snow-step.yml
+    parameters:
+      displayName: Feature store plan and apply (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        scripts/render_manifest.sh
+        FS=(--database ${{ parameters.db }} --schema FEATURES --target ${{ parameters.env }})
+        # init marks the schema as a feature store the first time; it writes only into a scratch directory
+        (cd "$(mktemp -d)" && cp "$(Build.SourcesDirectory)/features/manifest.yml" . && snow feature init "${CONN[@]}" "${FS[@]}" >/dev/null)
+        cd features
+        snow feature plan "${CONN[@]}" "${FS[@]}"
+        snow feature apply "${CONN[@]}" "${FS[@]}"
+  - template: snow-step.yml
+    parameters:
+      displayName: Code to the stage (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        for d in src jobs config; do
+          snow stage copy "${CONN[@]}" $d @${{ parameters.db }}.WORKSPACE.CODE/$(Build.BuildId)/$d --recursive --overwrite
+        done
+  - ${{ if eq(parameters.isDev, true) }}:
+    - template: snow-step.yml
+      parameters:
+        displayName: Train, gate and log V$(Build.BuildId)
+        name: submit
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          python -m luckml.submit --env ${{ parameters.env }} --job train --version V$(Build.BuildId) --run-id $(Build.BuildId) --build-dir $(Build.BuildId)
+  - ${{ if ne(parameters.isDev, true) }}:
+    - template: snow-step.yml
+      parameters:
+        displayName: Promote ${{ parameters.modelVersion }} from ${{ parameters.previousDb }}
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          snow sql "${CONN[@]}" --filename scripts/promote.sql -D db=${{ parameters.db }} -D src_db=${{ parameters.previousDb }} -D version=${{ parameters.modelVersion }}
+  - ${{ if eq(parameters.isProd, true) }}:
+    - template: snow-step.yml
+      parameters:
+        displayName: Set the default version
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}
+  - template: snow-step.yml
+    parameters:
+      displayName: Forecast with ${{ parameters.modelVersion }} (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        python -m luckml.submit --env ${{ parameters.env }} --job forecast --version ${{ parameters.modelVersion }} --run-id $(Build.BuildId) --build-dir $(Build.BuildId)
+  - template: snow-step.yml
+    parameters:
+      displayName: Verify and monitor (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        snow sql "${CONN[@]}" --format json --filename scripts/verify.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} | python3 -c "
+        import json, sys
+        out = json.load(sys.stdin); row = (out[-1] if isinstance(out[-1], dict) else out[-1][0])
+        print('verify:', row)
+        raise SystemExit(1 if row['NULL_FORECASTS'] > 0 or row['VERSION_PRESENT'] == 0 or row['FORECAST_ROWS'] == 0 else 0)"
+        snow sql "${CONN[@]}" --filename scripts/monitor.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D wh=ML_WH

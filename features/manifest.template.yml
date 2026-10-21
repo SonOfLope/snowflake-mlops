@@ -1,0 +1,19 @@
+manifest_version: 1
+type: feature_store
+default_target: dev
+targets:
+  dev:
+    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    database: DEV_ML_DB
+    schema: FEATURES
+    role: RBAC_ML_DEPLOYER_DEV
+  test:
+    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    database: TEST_ML_DB
+    schema: FEATURES
+    role: RBAC_ML_DEPLOYER_TEST
+  prod:
+    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    database: PROD_ML_DB
+    schema: FEATURES
+    role: RBAC_ML_DEPLOYER_PROD

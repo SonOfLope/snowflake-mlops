@@ -1,0 +1,5 @@
+snowflake-cli>=3.30
+snowflake-ml-python>=2.6
+lightgbm==4.7.0
+scikit-learn>=1.8
+pyyaml>=6

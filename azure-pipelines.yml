@@ -1,0 +1,96 @@
+trigger:
+  batch: true
+  branches:
+    include: [main]
+  paths:
+    exclude: [docs/*, img/*, '*.md']
+
+# Pipeline variables set on the definition, never in this file: serviceConnectionDev, serviceConnectionTest,
+# serviceConnectionProd, snowflakeAccount, agentPool. See bootstrap/README.md.
+pool:
+  name: $(agentPool)
+
+stages:
+  - stage: Validate
+    jobs:
+      - job: validate
+        steps:
+          - template: pipelines/templates/tools.yml
+          - bash: |
+              set -euo pipefail
+              ruff check .
+              pytest -q
+            displayName: ruff and pytest
+          - template: pipelines/templates/snow-step.yml
+            parameters:
+              displayName: DCM and feature store plans against dev
+              serviceConnection: $(serviceConnectionDev)
+              user: SVC_MLOPS_DEV
+              role: RBAC_ML_DEPLOYER_DEV
+              script: |
+                (cd dcm && snow dcm plan "${CONN[@]}" --target dev)
+                scripts/render_manifest.sh
+                (cd features && snow feature plan "${CONN[@]}" --database DEV_ML_DB --schema FEATURES --target dev)
+
+  # A pull request validation run (branch policy) stops after Validate; main continues.
+  - stage: Dev
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+    jobs:
+      - deployment: dev
+        environment: LuckData-Snowflake-MLOps-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - template: pipelines/templates/deploy-env.yml
+                  parameters:
+                    env: dev
+                    db: DEV_ML_DB
+                    serviceConnection: $(serviceConnectionDev)
+                    modelVersion: $(submit.modelVersion)
+                    isDev: true
+
+  - stage: Test
+    dependsOn: Dev
+    condition: succeeded()
+    variables:
+      modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
+    jobs:
+      - deployment: test
+        environment: LuckData-Snowflake-MLOps-test
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - template: pipelines/templates/deploy-env.yml
+                  parameters:
+                    env: test
+                    db: TEST_ML_DB
+                    previousDb: DEV_ML_DB
+                    serviceConnection: $(serviceConnectionTest)
+                    modelVersion: $(modelVersion)
+
+  - stage: Prod
+    dependsOn: Test
+    condition: succeeded()
+    variables:
+      modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
+    jobs:
+      - deployment: prod
+        environment: LuckData-Snowflake-MLOps-prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - template: pipelines/templates/deploy-env.yml
+                  parameters:
+                    env: prod
+                    db: PROD_ML_DB
+                    previousDb: TEST_ML_DB
+                    serviceConnection: $(serviceConnectionProd)
+                    modelVersion: $(modelVersion)
+                    isProd: true
