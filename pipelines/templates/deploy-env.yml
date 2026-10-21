@@ -63,6 +63,7 @@ steps:
       parameters:
         displayName: Train, gate and log V$(Build.BuildId)
         name: submit
+        retry: 0
         serviceConnection: ${{ parameters.serviceConnection }}
         user: SVC_MLOPS_${{ upper(parameters.env) }}
         role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
