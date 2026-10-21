@@ -41,9 +41,11 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         FS=(--database ${{ parameters.db }} --schema FEATURES --target ${{ parameters.env }})
-        # init marks the schema as a feature store the first time; it writes only into a scratch directory
-        (cd "$(mktemp -d)" && cp "$(Build.SourcesDirectory)/features/manifest.yml" . && snow feature init "${CONN[@]}" "${FS[@]}" >/dev/null)
         cd features
+        # the first run marks the schema as a feature store; init runs in a scratch directory so it exports nothing here
+        if ! snow feature list "${CONN[@]}" "${FS[@]}" >/dev/null 2>&1; then
+          (cd "$(mktemp -d)" && cp "$(Build.SourcesDirectory)/features/manifest.yml" . && snow feature init --yaml "${CONN[@]}" "${FS[@]}")
+        fi
         snow feature plan "${CONN[@]}" "${FS[@]}"
         snow feature apply "${CONN[@]}" "${FS[@]}"
   - template: snow-step.yml
