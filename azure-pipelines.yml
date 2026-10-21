@@ -28,7 +28,6 @@ stages:
               user: SVC_MLOPS_DEV
               role: RBAC_ML_DEPLOYER_DEV
               script: |
-                scripts/render_manifest.sh
                 (cd dcm && snow dcm plan "${CONN[@]}" --target dev)
                 (cd features && snow feature plan "${CONN[@]}" --database DEV_ML_DB --schema FEATURES --target dev)
 

@@ -28,7 +28,6 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
-        scripts/render_manifest.sh
         cd dcm
         snow dcm create "${CONN[@]}" --target ${{ parameters.env }} --if-not-exists
         snow dcm plan "${CONN[@]}" --target ${{ parameters.env }}

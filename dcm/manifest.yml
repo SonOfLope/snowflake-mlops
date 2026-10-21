@@ -4,17 +4,17 @@ default_target: dev
 
 targets:
   dev:
-    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    account_identifier: OCHKNMX-GC94579
     project_name: DEV_ML_DB.WORKSPACE.MLOPS
     project_owner: RBAC_ML_DEPLOYER_DEV
     templating_config: dev
   test:
-    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    account_identifier: OCHKNMX-GC94579
     project_name: TEST_ML_DB.WORKSPACE.MLOPS
     project_owner: RBAC_ML_DEPLOYER_TEST
     templating_config: test
   prod:
-    account_identifier: ${SNOWFLAKE_ACCOUNT}
+    account_identifier: OCHKNMX-GC94579
     project_name: PROD_ML_DB.WORKSPACE.MLOPS
     project_owner: RBAC_ML_DEPLOYER_PROD
     templating_config: prod

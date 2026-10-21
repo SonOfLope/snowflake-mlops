@@ -21,10 +21,13 @@ the databases, roles, pool and warehouse this pipeline uses.
    the three environments, with the variables `serviceConnectionDev`, `serviceConnectionTest`,
    `serviceConnectionProd` (the connection names), `snowflakeAccount` (`<org>-<account>`) and `agentPool` (a Linux pool
    whose agents have Python 3.12).
-7. **Branch policy** on `main` with this pipeline as a build validation, so a pull request runs `Validate`.
-8. **Service users.** In `LuckData-IaC-Snowflake-Horizon`, declare `SVC_MLOPS_DEV`, `SVC_MLOPS_TEST` and
+7. **Account identifier** in `dcm/manifest.yml` and `features/manifest.yml`: every target names the account the
+   pipeline deploys to, `<org>-<account>`, the same value as the `snowflakeAccount` variable. One account with three
+   databases today; if an environment moves to its own account, its target changes here.
+8. **Branch policy** on `main` with this pipeline as a build validation, so a pull request runs `Validate`.
+9. **Service users.** In `LuckData-IaC-Snowflake-Horizon`, declare `SVC_MLOPS_DEV`, `SVC_MLOPS_TEST` and
    `SVC_MLOPS_PROD` in `environments/account/config/service_users.yaml`, `TYPE = SERVICE`, default role
    `RBAC_ML_DEPLOYER_<ENV>`, default warehouse `ML_WH`, workload identity `OIDC` with the issuer and subject from
    step 2 and the audiences `fb60f99c-7a34-4190-8149-302f77469936` and `api://AzureADTokenExchange`. Its pipeline
    creates them.
-9. **First run** of the pipeline on `main`. `Validate` and `Dev` run, `Test` follows, `Prod` after its approval.
+10. **First run** of the pipeline on `main`. `Validate` and `Dev` run, `Test` follows, `Prod` after its approval.
