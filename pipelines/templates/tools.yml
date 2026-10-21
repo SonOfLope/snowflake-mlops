@@ -8,11 +8,12 @@ parameters:
 steps:
   - bash: |
       set -euo pipefail
-      python3 --version | grep -q "Python ${{ parameters.pythonVersion }}" || { echo "python3 is not ${{ parameters.pythonVersion }}"; exit 1; }
+      py=$(command -v python${{ parameters.pythonVersion }} || command -v python3 || true)
+      "$py" --version 2>/dev/null | grep -q "Python ${{ parameters.pythonVersion }}" || { echo "no Python ${{ parameters.pythonVersion }} on this agent (python${{ parameters.pythonVersion }} or python3)"; exit 1; }
       key=$(sha256sum requirements-dev.txt | cut -c1-16)
       dest="$AGENT_TOOLSDIRECTORY/luckml/$key"
       if [[ ! -x "$dest/bin/python" ]]; then
-        python3 -m venv "$dest"
+        "$py" -m venv "$dest"
         for attempt in 1 2 3; do
           "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt && break
           [[ $attempt -eq 3 ]] && exit 1; echo "pip attempt $attempt failed, retrying"; sleep 15
