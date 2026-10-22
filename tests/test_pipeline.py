@@ -31,3 +31,20 @@ def test_step_display_names_carry_no_runtime_variable():
     assert names
     for name in names:
         assert "$(" not in name and "modelVersion" not in name, name
+
+
+def test_every_environment_sets_the_default_after_the_gate_and_the_verify():
+    text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    names = re.findall(r"displayName:\s*(.+)", text)
+    gate = next(i for i, n in enumerate(names) if n.startswith("Actuals and regression gate"))
+    verify = next(i for i, n in enumerate(names) if n.startswith("Verify and monitor"))
+    default = next(i for i, n in enumerate(names) if n.startswith("Set the default version"))
+    assert gate < verify < default
+    block = text[text.index("Set the default version") - 400 : text.index("Set the default version")]
+    assert "isProd" not in block
+
+
+def test_the_regression_tolerance_comes_from_the_environment_configuration():
+    text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert "regressionTolerance" not in text
+    assert "regression_tolerance" in text

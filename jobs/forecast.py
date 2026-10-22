@@ -33,7 +33,7 @@ def main(argv=None) -> int:
         "select ?, 'forecast', ?, null, true, current_timestamp()",
         params=[a.run_id, a.version],
     ).collect()
-    print(json.dumps({"version": a.version, "rows": n, "gate": True}))
+    print(json.dumps({"version": a.version, "rows": n}))
     return 0
 
 

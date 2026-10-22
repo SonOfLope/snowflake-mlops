@@ -24,10 +24,11 @@ the databases, roles, pool and warehouse this pipeline uses.
 7. **Account identifier** in `dcm/manifest.yml` and `features/manifest.yml`: every target names the account the
    pipeline deploys to, `<org>-<account>`, the same value as the `snowflakeAccount` variable. One account with three
    databases today; if an environment moves to its own account, its target changes here.
-8. **Branch policy** on `main` with this pipeline as a build validation, so a pull request runs `Validate`.
-9. **Service users.** In `LuckData-IaC-Snowflake-Horizon`, declare `SVC_MLOPS_DEV`, `SVC_MLOPS_TEST` and
+8. **Git API integration and secret** for Snowsight Workspaces, in `LuckData-IaC-Snowflake-Horizon`: an API integration of type `git_https_api` whose allowed prefix is this repository's Azure DevOps URL, a secret holding a personal access token with code read and write on the repository, both usable by `FR_AI_ENGINEER`. This is what lets an engineer open the repository as a Workspace and push a branch from it.
+9. **Branch policy** on `main` with this pipeline as a build validation, so a pull request runs `Validate`.
+10. **Service users.** In `LuckData-IaC-Snowflake-Horizon`, declare `SVC_MLOPS_DEV`, `SVC_MLOPS_TEST` and
    `SVC_MLOPS_PROD` in `environments/account/config/service_users.yaml`, `TYPE = SERVICE`, default role
    `RBAC_ML_DEPLOYER_<ENV>`, default warehouse `ML_WH`, workload identity `OIDC` with the issuer and subject from
    step 2 and the audiences `fb60f99c-7a34-4190-8149-302f77469936` and `api://AzureADTokenExchange`. Its pipeline
    creates them.
-10. **First run** of the pipeline on `main`. `Validate` and `Dev` run, `Test` follows, `Prod` after its approval.
+11. **First run** of the pipeline on `main`. `Validate` and `Dev` run, `Test` follows, `Prod` after its approval.
