@@ -19,6 +19,10 @@ targets:
     project_owner: RBAC_ML_DEPLOYER_PROD
     templating_config: prod
 
+assets:
+  luckml:
+    path: 'assets/luckml/**/*'
+
 templating:
   defaults:
     wh: ML_WH

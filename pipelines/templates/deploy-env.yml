@@ -14,8 +14,8 @@ parameters:
     type: boolean
     default: false
 
-# One environment, six steps: schema objects, feature views, code to the stage, the version (trained in dev,
-# copied from the previous environment elsewhere), the forecast, then verify and monitor.
+# One environment: schema objects and the code bundle, feature views, the version (trained in dev, copied from the
+# previous environment elsewhere), the forecast, the actuals and the regression gate, verify and monitor, the default.
 steps:
   - template: tools.yml
   - template: snow-step.yml
@@ -44,28 +44,18 @@ steps:
         fi
         snow feature plan "${CONN[@]}" "${FS[@]}"
         snow feature apply "${CONN[@]}" "${FS[@]}"
-  - template: snow-step.yml
-    parameters:
-      displayName: Code to the stage (${{ parameters.env }})
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        # the package directory itself, not src/, which also holds the egg-info the editable install writes
-        for d in src/luckml jobs config; do
-          snow stage copy "${CONN[@]}" $d @${{ parameters.db }}.WORKSPACE.CODE/$(Build.BuildId)/$d --recursive --overwrite
-        done
   - ${{ if eq(parameters.isDev, true) }}:
     - template: snow-step.yml
       parameters:
         displayName: Train, gate and log
-        name: submit
+        name: train
         retry: 0
         serviceConnection: ${{ parameters.serviceConnection }}
         user: SVC_MLOPS_${{ upper(parameters.env) }}
         role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
         script: |
-          python -m luckml.submit --env ${{ parameters.env }} --job train --version V$(Build.BuildId) --run-id $(Build.BuildId) --build-dir $(Build.BuildId)
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId)
+          echo "##vso[task.setvariable variable=modelVersion;isOutput=true]V$(Build.BuildId)"
   - ${{ if ne(parameters.isDev, true) }}:
     - template: snow-step.yml
       parameters:
@@ -82,7 +72,7 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
-        python -m luckml.submit --env ${{ parameters.env }} --job forecast --version ${{ parameters.modelVersion }} --run-id $(Build.BuildId) --build-dir $(Build.BuildId)
+        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=${{ parameters.modelVersion }} -D run_id=$(Build.BuildId)
   - template: snow-step.yml
     parameters:
       displayName: Actuals and regression gate (${{ parameters.env }})
@@ -92,7 +82,7 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         snow sql "${CONN[@]}" --filename scripts/actuals.sql -D db=${{ parameters.db }}
-        tolerance=$(python -c "from luckml import config; print(config.load('${{ parameters.env }}').regression_tolerance)")
+        tolerance=$(python -c "import yaml; print(yaml.safe_load(open('dcm/assets/luckml/config/${{ parameters.env }}.yml'))['regression_tolerance'])")
         snow sql "${CONN[@]}" --filename scripts/regression.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D tolerance=$tolerance
   - template: snow-step.yml
     parameters:

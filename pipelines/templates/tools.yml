@@ -13,7 +13,6 @@ steps:
         python${{ parameters.pythonVersion }} -m venv "$dest"
         "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt
       fi
-      "$dest/bin/pip" install --quiet --disable-pip-version-check --no-deps -e .
       echo "##vso[task.prependpath]$dest/bin"
       "$dest/bin/snow" --version
     displayName: Python environment and Snowflake CLI

@@ -28,10 +28,7 @@ def config_dir() -> Path:
     override = os.environ.get("LUCKML_CONFIG_DIR")
     if override:
         return Path(override)
-    local = Path.cwd() / "config"
-    if local.is_dir():
-        return local
-    return Path(__file__).resolve().parents[2] / "config"
+    return Path(__file__).resolve().parents[1] / "config"
 
 
 def load(env: str) -> Config:

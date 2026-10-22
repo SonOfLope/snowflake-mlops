@@ -41,7 +41,6 @@ class FakeSessionClass:
 
 
 def test_named_connection_keeps_the_connections_role(monkeypatch):
-    monkeypatch.delenv("SNOWFLAKE_TOKEN", raising=False)
     monkeypatch.setenv("SNOWFLAKE_CONNECTION_NAME", "mine")
     monkeypatch.setattr(session, "get_active_session", lambda: (_ for _ in ()).throw(SnowparkSessionException("none")))
     monkeypatch.setattr(session, "Session", FakeSessionClass)
