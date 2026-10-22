@@ -13,9 +13,9 @@ parameters:
   - name: isDev
     type: boolean
     default: false
-  - name: isProd
-    type: boolean
-    default: false
+  - name: regressionTolerance
+    type: string
+    default: '0.10'
 
 # One environment, six steps: schema objects, feature views, code to the stage, the version (trained in dev,
 # copied from the previous environment elsewhere), the forecast, then verify and monitor.
@@ -78,15 +78,6 @@ steps:
         role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
         script: |
           snow sql "${CONN[@]}" --filename scripts/promote.sql -D db=${{ parameters.db }} -D src_db=${{ parameters.previousDb }} -D version=${{ parameters.modelVersion }}
-  - ${{ if eq(parameters.isProd, true) }}:
-    - template: snow-step.yml
-      parameters:
-        displayName: Set the default version
-        serviceConnection: ${{ parameters.serviceConnection }}
-        user: SVC_MLOPS_${{ upper(parameters.env) }}
-        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-        script: |
-          snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}
   - template: snow-step.yml
     parameters:
       displayName: Forecast (${{ parameters.env }})
@@ -95,6 +86,16 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         python -m luckml.submit --env ${{ parameters.env }} --job forecast --version ${{ parameters.modelVersion }} --run-id $(Build.BuildId) --build-dir $(Build.BuildId)
+  - template: snow-step.yml
+    parameters:
+      displayName: Actuals and regression gate (${{ parameters.env }})
+      retry: 0
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        snow sql "${CONN[@]}" --filename scripts/actuals.sql -D db=${{ parameters.db }}
+        snow sql "${CONN[@]}" --filename scripts/regression.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D tolerance=${{ parameters.regressionTolerance }}
   - template: snow-step.yml
     parameters:
       displayName: Verify and monitor (${{ parameters.env }})
@@ -108,3 +109,11 @@ steps:
         print('verify:', row)
         raise SystemExit(1 if row['NULL_FORECASTS'] > 0 or row['VERSION_PRESENT'] == 0 or row['FORECAST_ROWS'] == 0 else 0)"
         snow sql "${CONN[@]}" --filename scripts/monitor.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D wh=ML_WH
+  - template: snow-step.yml
+    parameters:
+      displayName: Set the default version (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}

@@ -92,4 +92,3 @@ stages:
                     previousDb: TEST_ML_DB
                     serviceConnection: $(serviceConnectionProd)
                     modelVersion: $(modelVersion)
-                    isProd: true

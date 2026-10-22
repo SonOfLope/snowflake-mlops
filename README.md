@@ -8,9 +8,9 @@ The monthly site tonnes forecast as code on Snowflake. A small Python package tr
 
 1. **Experiment in dev.** An AI engineer works directly in `DEV_ML_DB` as `FR_AI_ENGINEER`, from a Workspace notebook or an IDE, and logs as many versions as the work needs. Nothing here touches `main`.
 2. **Pull request.** The candidate's code goes on a branch. The branch policy runs the `Validate` stage: `ruff`, `pytest`, `snow dcm plan` and `snow feature plan` against dev, signed in as `SVC_MLOPS_DEV`.
-3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects and feature views, copies the code to a stage, trains as a Snowflake ML Job on `ML_CPU_POOL`, gates on MAPE, logs version `V<build>` to `DEV_ML_DB.MODELS`, writes the forecast and creates the monitor.
-4. **Test.** Receives the same version with `CREATE MODEL ... FROM MODEL`, never a retrain, then forecasts, verifies and monitors on `TEST_ML_DB`.
-5. **Prod.** After the approval on the `LuckData-Snowflake-MLOps-prod` environment, the same version is copied into `PROD_ML_DB`, set as the default version, forecast, verified and monitored.
+3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects and feature views, copies the code to a stage, trains as a Snowflake ML Job on `ML_CPU_POOL`, gates on MAPE, logs version `V<build>` to `DEV_ML_DB.MODELS`, writes the forecast, refreshes the actuals, passes the regression gate against the current default, verifies, creates the monitor and sets the version as dev's default.
+4. **Test.** Receives the same version with `CREATE MODEL ... FROM MODEL`, never a retrain, then forecasts, refreshes the actuals, passes the regression gate, verifies, monitors and sets the default on `TEST_ML_DB`.
+5. **Prod.** After the approval on the `LuckData-Snowflake-MLOps-prod` environment, the same version is copied into `PROD_ML_DB` and goes through the same steps. The default version in prod is what production code calls, and it moves only after the candidate passed the regression gate there.
 
 `docs/architecture.md` walks the diagram journey by journey.
 
@@ -24,7 +24,7 @@ jobs/                          train.py and forecast.py, the ML Job entry points
 dcm/                           DCM project: WORKSPACE view, tables and stage, one target per environment
 features/                      declarative feature store: SITE entity, SITE_MONTH_LAGS source, SITE_MONTHLY_TONNES view
 config/                        dev.yml, test.yml, prod.yml
-scripts/                       promote.sql, set_default.sql, monitor.sql, verify.sql
+scripts/                       promote.sql, actuals.sql, regression.sql, verify.sql, monitor.sql, set_default.sql
 tests/                         unit tests, no Snowflake connection needed
 bootstrap/README.md            what to create in Azure DevOps and Snowflake before the first run
 docs/architecture.md           the diagram explained
