@@ -61,7 +61,7 @@ steps:
   - ${{ if eq(parameters.isDev, true) }}:
     - template: snow-step.yml
       parameters:
-        displayName: Train, gate and log V$(Build.BuildId)
+        displayName: Train, gate and log
         name: submit
         retry: 0
         serviceConnection: ${{ parameters.serviceConnection }}
@@ -72,7 +72,7 @@ steps:
   - ${{ if ne(parameters.isDev, true) }}:
     - template: snow-step.yml
       parameters:
-        displayName: Promote ${{ parameters.modelVersion }} from ${{ parameters.previousDb }}
+        displayName: Promote from ${{ parameters.previousDb }}
         serviceConnection: ${{ parameters.serviceConnection }}
         user: SVC_MLOPS_${{ upper(parameters.env) }}
         role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
@@ -89,7 +89,7 @@ steps:
           snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}
   - template: snow-step.yml
     parameters:
-      displayName: Forecast with ${{ parameters.modelVersion }} (${{ parameters.env }})
+      displayName: Forecast (${{ parameters.env }})
       serviceConnection: ${{ parameters.serviceConnection }}
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}

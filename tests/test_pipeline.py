@@ -23,3 +23,11 @@ def test_stage_outputs_are_read_only_from_direct_dependencies():
             assert referenced in _depends_on(stage), (
                 f"stage {stage['stage']} reads outputs of {referenced} without depending on it directly"
             )
+
+
+def test_step_display_names_carry_no_runtime_variable():
+    template = PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml"
+    names = re.findall(r"displayName:\s*(.+)", template.read_text())
+    assert names
+    for name in names:
+        assert "$(" not in name and "modelVersion" not in name, name
