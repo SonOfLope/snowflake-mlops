@@ -19,6 +19,7 @@ class Config:
     feature_view: str
     feature_view_version: str
     gate_mape_max: float
+    regression_tolerance: float
     horizon_months: int
     eval_months: int
 

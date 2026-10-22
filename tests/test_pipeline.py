@@ -42,3 +42,9 @@ def test_every_environment_sets_the_default_after_the_gate_and_the_verify():
     assert gate < verify < default
     block = text[text.index("Set the default version") - 400 : text.index("Set the default version")]
     assert "isProd" not in block
+
+
+def test_the_regression_tolerance_comes_from_the_environment_configuration():
+    text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert "regressionTolerance" not in text
+    assert "regression_tolerance" in text

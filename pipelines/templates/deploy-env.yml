@@ -13,9 +13,6 @@ parameters:
   - name: isDev
     type: boolean
     default: false
-  - name: regressionTolerance
-    type: string
-    default: '0.10'
 
 # One environment, six steps: schema objects, feature views, code to the stage, the version (trained in dev,
 # copied from the previous environment elsewhere), the forecast, then verify and monitor.
@@ -95,7 +92,8 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         snow sql "${CONN[@]}" --filename scripts/actuals.sql -D db=${{ parameters.db }}
-        snow sql "${CONN[@]}" --filename scripts/regression.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D tolerance=${{ parameters.regressionTolerance }}
+        tolerance=$(python -c "from luckml import config; print(config.load('${{ parameters.env }}').regression_tolerance)")
+        snow sql "${CONN[@]}" --filename scripts/regression.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }} -D tolerance=$tolerance
   - template: snow-step.yml
     parameters:
       displayName: Verify and monitor (${{ parameters.env }})
