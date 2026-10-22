@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT))
 os.environ.setdefault("LUCKML_CONFIG_DIR", str(ROOT / "config"))
 
 import pandas as pd

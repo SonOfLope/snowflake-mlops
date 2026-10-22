@@ -1,2 +1,3 @@
+src = [".", "dcm/assets/luckml"]
 line-length = 110
 target-version = "py312"

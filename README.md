@@ -18,13 +18,11 @@ The monthly site tonnes forecast as code on Snowflake. A small Python package tr
 
 ```
 azure-pipelines.yml            Validate, Dev, Test, Prod (approval)
-pipelines/templates/           tools.yml (Python environment), snow-step.yml (signed-in step), deploy-env.yml (the six steps per environment)
-src/luckml/                    config, session, data, features, model, registry, forecast, submit
-jobs/                          train.py and forecast.py, the ML Job entry points
-dcm/                           DCM project: WORKSPACE view, tables and stage, one target per environment
+pipelines/templates/           tools.yml (Python environment), snow-step.yml (signed-in step), deploy-env.yml (the steps per environment)
+dcm/                           DCM project: WORKSPACE view, tables, stage and the LUCKML code bundle, one target per environment
+dcm/assets/luckml/             the code bundle: code_bundle.yml, the luckml package, jobs/train.py and jobs/forecast.py, config/
 features/                      declarative feature store: SITE entity, SITE_MONTH_LAGS source, SITE_MONTHLY_TONNES view
-config/                        dev.yml, test.yml, prod.yml
-scripts/                       promote.sql, actuals.sql, regression.sql, verify.sql, monitor.sql, set_default.sql
+scripts/                       run_job.sql, promote.sql, actuals.sql, regression.sql, verify.sql, monitor.sql, set_default.sql
 tests/                         unit tests, no Snowflake connection needed
 bootstrap/README.md            what to create in Azure DevOps and Snowflake before the first run
 docs/architecture.md           the diagram explained
@@ -36,7 +34,7 @@ img/                           the lifecycle and quality gates diagrams, editabl
 ## Local run
 
 ```bash
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -e .
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 snow connection add                      # a connection for your user, role FR_AI_ENGINEER
 export SNOWFLAKE_CONNECTION_NAME=<name>
 export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
@@ -45,12 +43,16 @@ export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
 (cd dcm && snow dcm plan -c <name> --target dev)
 (cd features && snow feature plan -c <name> --database DEV_ML_DB --schema FEATURES --target dev)
 
-for d in src/luckml jobs config; do snow stage copy -c <name> $d @DEV_ML_DB.WORKSPACE.CODE/local/$d --recursive --overwrite; done
-.venv/bin/python -m luckml.submit --env dev --job train --version VLOCAL --run-id local --build-dir local
-.venv/bin/python -m luckml.submit --env dev --job forecast --version VLOCAL --run-id local --build-dir local
 ```
 
-`snow stage copy --overwrite` can leave an unchanged-size file in place; remove the folder on the stage before copying when a local change does not show up in a job.
+The jobs run only through the pipeline, as the code bundle `DEV_ML_DB.WORKSPACE.LUCKML` that the DCM deploy creates. To run one by hand after a deploy, with a role that holds usage on the bundle and the pool:
+
+```sql
+USE DATABASE DEV_ML_DB; USE SCHEMA WORKSPACE;
+EXECUTE CODE BUNDLE DEV_ML_DB.WORKSPACE.LUCKML
+  ENTRYPOINT = 'jobs/train.py'
+  ARGUMENTS = ('--env', 'dev', '--version', 'VEXP_1', '--run-id', 'manual');
+```
 
 ## Pipeline variables
 

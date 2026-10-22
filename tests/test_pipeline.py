@@ -48,3 +48,18 @@ def test_the_regression_tolerance_comes_from_the_environment_configuration():
     text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
     assert "regressionTolerance" not in text
     assert "regression_tolerance" in text
+
+
+def test_jobs_run_as_the_code_bundle_declared_by_dcm():
+    root = PIPELINE.parent
+    manifest = yaml.safe_load((root / "dcm" / "manifest.yml").read_text())
+    assert manifest["assets"]["luckml"]["path"] == "assets/luckml/**/*"
+    assert (root / "dcm" / "assets" / "luckml" / "code_bundle.yml").is_file()
+    definitions = (root / "dcm" / "sources" / "definitions" / "workspace.sql").read_text()
+    assert re.search(r"DEFINE CODE BUNDLE \{\{ db \}\}\.WORKSPACE\.LUCKML\s+FROM 'asset://luckml/'", definitions)
+    template = (root / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert "luckml.submit" not in template and "snow stage copy" not in template
+    assert template.count("scripts/run_job.sql") == 2
+    sql = (root / "scripts" / "run_job.sql").read_text()
+    assert "EXECUTE CODE BUNDLE <% db %>.WORKSPACE.LUCKML" in sql
+    assert "CODE_BUNDLE_HISTORY" in sql

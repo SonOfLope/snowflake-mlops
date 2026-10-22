@@ -28,4 +28,8 @@ DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG (
 ) COMMENT = 'One row per pipeline step that trained or forecast.';
 
 DEFINE STAGE {{ db }}.WORKSPACE.CODE
-  COMMENT = 'Package and job entry points the ML Jobs run from, one folder per build.';
+  COMMENT = 'Results the ML Jobs write, the code bundle result stage.';
+
+DEFINE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+  FROM 'asset://luckml/'
+  COMMENT = 'Training and forecast jobs, run on ML_CPU_POOL with EXECUTE CODE BUNDLE.';

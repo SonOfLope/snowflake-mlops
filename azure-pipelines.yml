@@ -21,6 +21,8 @@ stages:
               ruff check .
               pytest -q
             displayName: ruff and pytest
+            env:
+              PYTHONDONTWRITEBYTECODE: '1'
           - template: pipelines/templates/snow-step.yml
             parameters:
               displayName: DCM and feature store plans against dev
@@ -48,7 +50,7 @@ stages:
                     env: dev
                     db: DEV_ML_DB
                     serviceConnection: $(serviceConnectionDev)
-                    modelVersion: $(submit.modelVersion)
+                    modelVersion: $(train.modelVersion)
                     isDev: true
 
   - stage: Test
@@ -58,7 +60,7 @@ stages:
       - deployment: test
         environment: LuckData-Snowflake-MLOps-test
         variables:
-          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
+          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.train.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
@@ -79,7 +81,7 @@ stages:
       - deployment: prod
         environment: LuckData-Snowflake-MLOps-prod
         variables:
-          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.submit.modelVersion'] ]
+          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.train.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
