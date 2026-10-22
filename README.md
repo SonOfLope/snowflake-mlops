@@ -28,6 +28,8 @@ scripts/                       promote.sql, set_default.sql, monitor.sql, verify
 tests/                         unit tests, no Snowflake connection needed
 bootstrap/README.md            what to create in Azure DevOps and Snowflake before the first run
 docs/architecture.md           the diagram explained
+CONTRIBUTING.md                how a change is made and reaches an environment
+features/README.md             the feature store project
 img/                           the lifecycle diagram, editable in draw.io
 ```
 

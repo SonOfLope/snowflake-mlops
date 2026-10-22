@@ -6,16 +6,7 @@ Three repositories share the work. `LuckData-IaC-Snowflake-Horizon` declares the
 
 ## A0, experiments
 
-The AI engineer signs in to Snowsight as `FR_AI_ENGINEER`, which holds admin on `DEV_ML_DB.FEATURES`, `WORKSPACE` and `MODELS`, and works in a Workspace against the dev feature view. Versions logged this way live in `DEV_ML_DB.MODELS` beside the pipeline's and never leave dev. The same role has read only on test and prod.
-
-The Workspace is created from this repository (Projects, Workspaces, From Git repository, this repository's URL, a personal branch), which needs the Git API integration and secret from the bootstrap. Day to day:
-
-1. Create or open the Workspace on a branch named after the change, with role `FR_AI_ENGINEER`, warehouse `ML_WH`, context `DEV_ML_DB.WORKSPACE`.
-2. Experiment in a notebook beside the code: read `DEV_ML_DB.FEATURES.SITE_MONTHLY_TONNES$1`, train, log versions to `DEV_ML_DB.MODELS.SITE_TONNES_FORECAST` under names that cannot collide with the pipeline's `V<build>` (a `VEXP_` prefix), compare them in the Models page.
-3. Put the change into the code and the YAML the pipeline runs (`src/luckml`, `jobs`, `features/sources`, `dcm/sources`), run the unit tests, commit and push the branch from the Workspace.
-4. Open the pull request. The branch policy runs `Validate`, which shows the DCM and feature store plans against dev as `SVC_MLOPS_DEV`. After the merge the pipeline trains, promotes and forecasts.
-
-A notebook is a place to try things, not a deployable. Nothing a notebook creates is read by test or prod.
+The AI engineer signs in to Snowsight as `FR_AI_ENGINEER`, which holds admin on `DEV_ML_DB.FEATURES`, `WORKSPACE` and `MODELS`, and works in a Workspace notebook or an IDE against the dev feature view. Versions logged this way live in `DEV_ML_DB.MODELS` beside the pipeline's and never leave dev. The same role has read only on test and prod.
 
 ## A1 to A6, code to prod
 
