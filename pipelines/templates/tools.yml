@@ -3,23 +3,18 @@ parameters:
     type: string
     default: '3.12'
 
-# One virtual environment per requirements.txt content, kept in the agent's tools directory, so a run installs
-# nothing when the pins have not changed. python3 on the agent must be the version in pythonVersion.
+# One virtual environment per requirements-dev.txt hash in the agent's tools directory, so a run installs nothing when the pins have not changed.
 steps:
   - bash: |
       set -euo pipefail
-      py=$(command -v python${{ parameters.pythonVersion }} || command -v python3 || true)
-      "$py" --version 2>/dev/null | grep -q "Python ${{ parameters.pythonVersion }}" || { echo "no Python ${{ parameters.pythonVersion }} on this agent (python${{ parameters.pythonVersion }} or python3)"; exit 1; }
       key=$(sha256sum requirements-dev.txt | cut -c1-16)
       dest="$AGENT_TOOLSDIRECTORY/luckml/$key"
       if [[ ! -x "$dest/bin/python" ]]; then
-        "$py" -m venv "$dest"
-        for attempt in 1 2 3; do
-          "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt && break
-          [[ $attempt -eq 3 ]] && exit 1; echo "pip attempt $attempt failed, retrying"; sleep 15
-        done
+        python${{ parameters.pythonVersion }} -m venv "$dest"
+        "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt
       fi
       "$dest/bin/pip" install --quiet --disable-pip-version-check --no-deps -e .
       echo "##vso[task.prependpath]$dest/bin"
       "$dest/bin/snow" --version
     displayName: Python environment and Snowflake CLI
+    retryCountOnTaskFailure: 1

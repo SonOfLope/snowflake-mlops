@@ -37,7 +37,7 @@ def main(argv=None) -> int:
     m = model.fit(train)
     metrics = model.evaluate(m, holdout)
     passed = model.gate(metrics, cfg)
-    write_run_log(s, cfg, a.run_id, "train", a.version, metrics["mape"], passed, os.environ.get("SNOWFLAKE_ML_JOB_ID"))
+    write_run_log(s, cfg, a.run_id, "train", a.version, metrics["mape"], passed)
     if passed:
         registry.log(s, cfg, m, a.version, metrics, train)
     print(json.dumps({"version": a.version, "mape": metrics["mape"], "gate": passed, "rows": metrics["rows"]}))

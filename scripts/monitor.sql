@@ -1,10 +1,13 @@
--- One monitor per promoted version over the forecast table. Variables: db, version, wh.
+-- One monitor per promoted version, over a view of that version's rows. Variables: db, version, wh.
+CREATE OR REPLACE VIEW <% db %>.WORKSPACE.FORECAST_<% version %> AS
+  SELECT * FROM <% db %>.WORKSPACE.FORECAST_SITE_MONTH WHERE MODEL_VERSION = '<% version %>';
+
 CREATE MODEL MONITOR IF NOT EXISTS <% db %>.MODELS.SITE_TONNES_FORECAST_<% version %>_MON
 WITH
   MODEL = <% db %>.MODELS.SITE_TONNES_FORECAST
   VERSION = <% version %>
   FUNCTION = predict
-  SOURCE = <% db %>.WORKSPACE.FORECAST_SITE_MONTH
+  SOURCE = <% db %>.WORKSPACE.FORECAST_<% version %>
   WAREHOUSE = <% wh %>
   REFRESH_INTERVAL = '1 day'
   AGGREGATION_WINDOW = '30 days'

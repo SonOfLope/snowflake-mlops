@@ -25,6 +25,10 @@ def run(cfg: Config, job: str, version: str, run_id: str, build_dir: str) -> dic
     )
     print(f"job {ml_job.id} submitted")
     status = ml_job.wait(timeout=WAIT_SECONDS)
+    s.sql(
+        f"update {cfg.database}.WORKSPACE.RUN_LOG set JOB_ID = ? where RUN_ID = ? and STAGE = ? and MODEL_VERSION = ?",
+        params=[ml_job.id, run_id, job, version],
+    ).collect()
     logs = ml_job.get_logs() or ""
     print(logs)
     if status != "DONE":

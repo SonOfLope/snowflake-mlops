@@ -29,9 +29,9 @@ def main(argv=None) -> int:
     rows = pd.concat([forecast.backfill_frame(mv, holdout), forecast.predict_horizon(mv, hist, cfg.horizon_months)])
     n = forecast.write(s, cfg, rows, a.version, a.run_id)
     s.sql(
-        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, GATE_PASSED, JOB_ID, RUN_AT) "
-        "select ?, 'forecast', ?, null, true, ?, current_timestamp()",
-        params=[a.run_id, a.version, os.environ.get("SNOWFLAKE_ML_JOB_ID")],
+        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, GATE_PASSED, RUN_AT) "
+        "select ?, 'forecast', ?, null, true, current_timestamp()",
+        params=[a.run_id, a.version],
     ).collect()
     print(json.dumps({"version": a.version, "rows": n, "gate": True}))
     return 0

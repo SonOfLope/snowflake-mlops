@@ -35,7 +35,7 @@ img/                           the lifecycle diagram, editable in draw.io
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -e .
-snow connection add                      # a connection for your user, role RBAC_ML_DEPLOYER_DEV or FR_AI_ENGINEER
+snow connection add                      # a connection for your user, role FR_AI_ENGINEER
 export SNOWFLAKE_CONNECTION_NAME=<name>
 export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
 

@@ -1,4 +1,6 @@
-"""One Snowpark session per process: the job's own inside Snowflake, the pipeline token in CI, a named connection locally."""
+"""One Snowpark session per process: the job's own inside Snowflake, the pipeline token in CI, a named connection locally.
+
+A named connection keeps its own role; the deployer role is taken only on the token path."""
 
 import os
 
@@ -30,7 +32,6 @@ def connect(cfg: Config) -> Session:
         )
         return builder.create()
     session = Session.builder.config("connection_name", os.environ.get("SNOWFLAKE_CONNECTION_NAME", "default")).create()
-    session.use_role(cfg.role)
     session.use_warehouse(cfg.warehouse)
     session.use_database(cfg.database)
     session.use_schema("WORKSPACE")

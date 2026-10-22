@@ -16,10 +16,7 @@ parameters:
     type: number
     default: 1
 
-# One step signed in to Snowflake as the environment's service user with the service connection's federated token.
-# retry: how many times the agent reruns the step after a failure, for transient faults; 0 where a failure must stand.
-# AzureCLI@2 with addSpnToEnvironment exposes that token as $idToken; nothing is stored anywhere.
-# The script gets CONN (flags for snow) and the SNOWFLAKE_* variables luckml.session reads.
+# One step signed in as the environment's service user; addSpnToEnvironment exposes the connection's federated token as $idToken.
 steps:
   - task: AzureCLI@2
     displayName: ${{ parameters.displayName }}
