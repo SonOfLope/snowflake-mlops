@@ -5,5 +5,7 @@ bundle:
   compute_options:
     compute_pool: ML_CPU_POOL
     query_warehouse: ML_WH
+    runtime_version: '2.10.0'
+    language_version: '3.12'
   properties:
-    result_stage: '@WORKSPACE.CODE'
+    result_stage: '@WORKSPACE.JOB_RESULTS'

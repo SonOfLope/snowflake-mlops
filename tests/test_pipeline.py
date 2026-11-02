@@ -63,3 +63,34 @@ def test_jobs_run_as_the_code_bundle_declared_by_dcm():
     sql = (root / "scripts" / "run_job.sql").read_text()
     assert "EXECUTE CODE BUNDLE <% db %>.WORKSPACE.LUCKML" in sql
     assert "CODE_BUNDLE_HISTORY" in sql
+
+
+def test_the_bundle_pins_its_runtime_and_writes_results_to_job_results():
+    spec = yaml.safe_load((PIPELINE.parent / "dcm" / "assets" / "luckml" / "code_bundle.yml").read_text())["bundle"]
+    assert spec["compute_options"]["runtime_version"] == "2.10.0"
+    assert spec["compute_options"]["language_version"] == "3.12"
+    assert spec["properties"]["result_stage"] == "@WORKSPACE.JOB_RESULTS"
+    definitions = (PIPELINE.parent / "dcm" / "sources" / "definitions" / "workspace.sql").read_text()
+    assert "DEFINE STAGE {{ db }}.WORKSPACE.JOB_RESULTS" in definitions
+
+
+def test_job_steps_print_the_jobs_own_output_even_when_the_job_fails():
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert template.count("scripts/job_output.sql") == 2
+    sql = (PIPELINE.parent / "scripts" / "job_output.sql").read_text()
+    assert "CODE_BUNDLE_HISTORY" in sql and "RECORD_TYPE = 'LOG'" in sql
+
+
+def test_retirement_is_configured_per_environment_and_starts_disabled():
+    for env in ("dev", "test", "prod"):
+        cfg = yaml.safe_load((PIPELINE.parent / "dcm" / "assets" / "luckml" / "config" / f"{env}.yml").read_text())
+        assert cfg["retire_enabled"] is False
+        assert cfg["retain_versions"] == 50
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    names = re.findall(r"displayName:\s*(.+)", template)
+    assert names[-1].startswith("Retire old versions")
+    assert "scripts/retire.sql" in template and "retire_enabled" in template
+    sql = (PIPELINE.parent / "scripts" / "retire.sql").read_text()
+    assert "DROP MODEL MONITOR IF EXISTS" in sql and "DROP VIEW IF EXISTS" in sql
+    assert sql.index("DROP MODEL MONITOR") < sql.index("DROP VIEW") < sql.index("DROP VERSION")
+    assert "is_default_version" in sql and "<% keep %>" in sql

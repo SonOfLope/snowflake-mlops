@@ -3,15 +3,15 @@ parameters:
     type: string
     default: '3.12'
 
-# One virtual environment per requirements-dev.txt hash in the agent's tools directory, so a run installs nothing when the pins have not changed.
+# One virtual environment per requirements.txt hash in the agent's tools directory, so a run installs nothing when the pins have not changed.
 steps:
   - bash: |
       set -euo pipefail
-      key=$(sha256sum requirements-dev.txt | cut -c1-16)
+      key=$(sha256sum requirements.txt | cut -c1-16)
       dest="$AGENT_TOOLSDIRECTORY/luckml/$key"
       if [[ ! -x "$dest/bin/python" ]]; then
         python${{ parameters.pythonVersion }} -m venv "$dest"
-        "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements-dev.txt
+        "$dest/bin/pip" install --quiet --disable-pip-version-check -r requirements.txt
       fi
       echo "##vso[task.prependpath]$dest/bin"
       "$dest/bin/snow" --version

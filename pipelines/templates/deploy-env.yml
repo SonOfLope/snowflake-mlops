@@ -54,8 +54,11 @@ steps:
         user: SVC_MLOPS_${{ upper(parameters.env) }}
         role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
         script: |
-          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId)
-          echo "##vso[task.setvariable variable=modelVersion;isOutput=true]V$(Build.BuildId)"
+          rc=0
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=train | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" || echo "job output not readable"
+          [ $rc -eq 0 ] && echo "##vso[task.setvariable variable=modelVersion;isOutput=true]V$(Build.BuildId)"
+          exit $rc
   - ${{ if ne(parameters.isDev, true) }}:
     - template: snow-step.yml
       parameters:
@@ -72,7 +75,10 @@ steps:
       user: SVC_MLOPS_${{ upper(parameters.env) }}
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
-        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=${{ parameters.modelVersion }} -D run_id=$(Build.BuildId)
+        rc=0
+        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=${{ parameters.modelVersion }} -D run_id=$(Build.BuildId) || rc=$?
+        snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=forecast | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" || echo "job output not readable"
+        exit $rc
   - template: snow-step.yml
     parameters:
       displayName: Actuals and regression gate (${{ parameters.env }})
@@ -105,3 +111,13 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}
+  - template: snow-step.yml
+    parameters:
+      displayName: Retire old versions (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        read -r enabled keep < <(python -c "import yaml; c = yaml.safe_load(open('dcm/assets/luckml/config/${{ parameters.env }}.yml')); print(str(c['retire_enabled']).lower(), c['retain_versions'])")
+        if [ "$enabled" != "true" ]; then echo "retire_enabled is false in config/${{ parameters.env }}.yml, nothing retired"; exit 0; fi
+        snow sql "${CONN[@]}" --filename scripts/retire.sql -D db=${{ parameters.db }} -D keep=$keep

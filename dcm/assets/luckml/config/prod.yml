@@ -11,3 +11,5 @@ gate_mape_max: 0.35
 regression_tolerance: 0.10
 horizon_months: 3
 eval_months: 3
+retire_enabled: false
+retain_versions: 50
