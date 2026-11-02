@@ -1,4 +1,4 @@
-"""Scores a model version on the months ahead and on the held-out months, and writes the rows."""
+"""Scores a model on the months ahead or on the held-out months, and writes the rows."""
 
 import numpy as np
 import pandas as pd
@@ -9,10 +9,13 @@ from luckml.features import FEATURE_COLUMNS, HORIZON_COLUMNS, TARGET, horizon_fr
 OUTPUT_COLUMNS = HORIZON_COLUMNS + ["FORECAST_TONNES", "ACTUAL_TONNES"]
 
 
-def _predict(mv, frame: pd.DataFrame) -> pd.Series:
-    scored = mv.run(frame[FEATURE_COLUMNS].reset_index(drop=True), function_name="predict")
-    new = [c for c in scored.columns if c not in FEATURE_COLUMNS]
-    return pd.Series(scored[new[-1]].to_numpy(dtype=float), index=frame.index)
+def _predict(m, frame: pd.DataFrame) -> pd.Series:
+    """m is a registry version (run) or a model fitted in the same job (predict)."""
+    if hasattr(m, "run"):
+        scored = m.run(frame[FEATURE_COLUMNS].reset_index(drop=True), function_name="predict")
+        new = [c for c in scored.columns if c not in FEATURE_COLUMNS]
+        return pd.Series(scored[new[-1]].to_numpy(dtype=float), index=frame.index)
+    return pd.Series(np.asarray(m.predict(frame[FEATURE_COLUMNS]), dtype=float), index=frame.index)
 
 
 def predict_horizon(mv, hist: pd.DataFrame, horizon: int) -> pd.DataFrame:
@@ -37,10 +40,10 @@ def predict_horizon(mv, hist: pd.DataFrame, horizon: int) -> pd.DataFrame:
     return frame[OUTPUT_COLUMNS].reset_index(drop=True)
 
 
-def backfill_frame(mv, holdout: pd.DataFrame) -> pd.DataFrame:
-    """The held-out months scored, with their actuals, so the monitor has ground truth from day one."""
+def backfill_frame(m, holdout: pd.DataFrame) -> pd.DataFrame:
+    """The held-out months scored by the fit that never saw them, with their actuals: the version's first rows with ground truth."""
     out = holdout[HORIZON_COLUMNS].copy()
-    out["FORECAST_TONNES"] = _predict(mv, holdout)
+    out["FORECAST_TONNES"] = _predict(m, holdout)
     out["ACTUAL_TONNES"] = holdout[TARGET].astype(float)
     return out[OUTPUT_COLUMNS].reset_index(drop=True)
 

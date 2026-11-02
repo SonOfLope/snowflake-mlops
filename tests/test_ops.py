@@ -68,23 +68,38 @@ def test_promote_monitors_then_sets_the_default_and_skips_retire_when_disabled()
     assert not any("DROP VERSION" in t for t in s.statements)
 
 
-def test_forecast_without_a_version_uses_the_default(monkeypatch):
+class FakeVersion:
+    def run(self, frame, function_name="predict"):
+        return frame.assign(output_feature_0=frame["LAG_1"] * 1.0)
+
+
+def test_forecast_without_a_version_uses_the_default(monkeypatch, feature_frame):
     from jobs import forecast as job
     from luckml import data, forecast, registry, session
 
     seen = {}
     monkeypatch.setattr(session, "connect", lambda cfg: FakeSession())
     monkeypatch.setattr(registry, "default_version", lambda s, cfg: "V7")
-    monkeypatch.setattr(registry, "get_version", lambda s, cfg, v: seen.setdefault("v", v))
-    monkeypatch.setattr(data, "load_feature_frame", lambda s, cfg: None)
-    monkeypatch.setattr(job.features, "training_frame", lambda h: h)
-    monkeypatch.setattr(job.features, "split_last_months", lambda f, n: (None, None))
-    monkeypatch.setattr(forecast, "backfill_frame", lambda mv, h: None)
-    monkeypatch.setattr(forecast, "predict_horizon", lambda mv, h, n: None)
-    monkeypatch.setattr(job.pd, "concat", lambda frames: None)
+    monkeypatch.setattr(registry, "get_version", lambda s, cfg, v: seen.setdefault("v", v) and FakeVersion())
+    monkeypatch.setattr(data, "load_feature_frame", lambda s, cfg: feature_frame)
     monkeypatch.setattr(forecast, "write", lambda s, cfg, rows, v, r: seen.setdefault("written", v) and 0)
     assert job.main(["--env", "dev", "--run-id", "m1"]) == 0
     assert seen == {"v": "V7", "written": "V7"}
+
+
+def test_forecast_job_writes_only_the_months_ahead(monkeypatch, feature_frame):
+    from jobs import forecast as job
+    from luckml import data, forecast, registry, session
+
+    written = []
+    monkeypatch.setattr(session, "connect", lambda cfg: FakeSession())
+    monkeypatch.setattr(registry, "get_version", lambda s, cfg, v: FakeVersion())
+    monkeypatch.setattr(data, "load_feature_frame", lambda s, cfg: feature_frame)
+    monkeypatch.setattr(forecast, "write", lambda s, cfg, rows, v, r: written.append(rows) or len(rows))
+    assert job.main(["--env", "dev", "--version", "V9", "--run-id", "m1"]) == 0
+    rows = written[0]
+    assert len(rows) == 3 and rows["ACTUAL_TONNES"].isna().all()
+    assert rows["MONTH"].min() > feature_frame["MONTH"].max()
 
 
 def test_gate_writes_its_run_log_row_even_when_it_fails():
