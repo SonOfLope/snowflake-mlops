@@ -31,3 +31,14 @@ def test_regression_gate_compares_weighted_errors():
     sql = (SCRIPTS / "regression.sql").read_text()
     assert sql.count("SUM(ABS(") == 2 and "AVG(ABS(" not in sql
     assert "wape" in sql
+
+
+def test_monitor_has_a_baseline_view_of_the_versions_training_rows():
+    sql = (SCRIPTS / "monitor.sql").read_text()
+    assert re.search(r"CREATE OR REPLACE VIEW <% db %>\.WORKSPACE\.BASELINE_<% version %> AS\s+SELECT \* FROM <% db %>\.WORKSPACE\.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>'", sql)
+    assert re.search(r"BASELINE = <% db %>\.WORKSPACE\.BASELINE_<% version %>\s", sql)
+
+
+def test_verify_counts_the_versions_baseline_rows():
+    sql = (SCRIPTS / "verify.sql").read_text()
+    assert re.search(r"FROM <% db %>\.WORKSPACE\.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>'\) AS baseline_rows", sql)

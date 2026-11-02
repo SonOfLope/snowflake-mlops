@@ -88,7 +88,19 @@ def test_retirement_is_configured_per_environment_and_starts_disabled():
     sql = (BUNDLE / "sql" / "retire.sql").read_text()
     assert "DROP MODEL MONITOR IF EXISTS" in sql and "DROP VIEW IF EXISTS" in sql
     assert sql.index("DROP MODEL MONITOR") < sql.index("DROP VIEW") < sql.index("DROP VERSION")
+    assert "WORKSPACE.BASELINE_' || r.v" in sql and sql.index("BASELINE_' || r.v") < sql.index("DROP VERSION")
     assert "is_default_version" in sql and "<% keep %>" in sql
+
+
+def _columns(definitions, table):
+    block = definitions[definitions.index(f"DEFINE TABLE {{{{ db }}}}.WORKSPACE.{table} ("):]
+    block = block[: block.index(")")]
+    return [line.strip().split()[0] for line in block.splitlines()[1:] if line.strip()]
+
+
+def test_the_baseline_table_mirrors_the_forecast_table_so_the_monitor_can_compare_them():
+    definitions = (PIPELINE.parent / "dcm" / "sources" / "definitions" / "workspace.sql").read_text()
+    assert _columns(definitions, "BASELINE_SITE_MONTH") == _columns(definitions, "FORECAST_SITE_MONTH")
 
 
 def test_the_monthly_cycle_is_a_task_graph_started_only_in_prod():

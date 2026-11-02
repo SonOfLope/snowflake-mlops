@@ -55,9 +55,9 @@ def gate(session, cfg: Config, version: str, run_id: str) -> None:
 
 def promote(session, cfg: Config, version: str, run_id: str) -> None:
     row = run(session, "verify", db=cfg.database, version=version)[0]
-    checks = {k: row[k] for k in ("FORECAST_ROWS", "NULL_FORECASTS", "VERSION_PRESENT")}
+    checks = {k: row[k] for k in ("FORECAST_ROWS", "NULL_FORECASTS", "VERSION_PRESENT", "BASELINE_ROWS")}
     print(checks)
-    if row["FORECAST_ROWS"] == 0 or row["NULL_FORECASTS"] > 0 or row["VERSION_PRESENT"] == 0:
+    if row["FORECAST_ROWS"] == 0 or row["NULL_FORECASTS"] > 0 or row["VERSION_PRESENT"] == 0 or row["BASELINE_ROWS"] == 0:
         log_run(session, cfg, run_id, "promote", version, False, checks)
         raise RuntimeError(f"{version} failed verification")
     run(session, "monitor", db=cfg.database, version=version, wh=cfg.warehouse)

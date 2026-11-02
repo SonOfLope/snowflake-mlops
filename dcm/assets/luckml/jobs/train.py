@@ -1,7 +1,8 @@
 """Train, evaluate, gate and log one model version. Runs inside a Snowflake ML Job.
 
 The score comes from a fit without the held-out months, and that fit's rows on those months are written as the version's first
-forecast rows; the version logged is refitted on the full history."""
+forecast rows; the version logged is refitted on the full history, and the training rows scored by it are written as the
+baseline its monitor measures drift against."""
 
 import argparse
 import json
@@ -42,8 +43,10 @@ def main(argv=None) -> int:
     passed = model.gate(metrics, cfg)
     write_run_log(s, cfg, a.run_id, "train", a.version, metrics, passed)
     if passed:
-        registry.log(s, cfg, model.fit(frame), a.version, metrics, frame)
-        forecast.write(s, cfg, forecast.backfill_frame(m, holdout), a.version, a.run_id)
+        refit = model.fit(frame)
+        registry.log(s, cfg, refit, a.version, metrics, frame)
+        forecast.write(s, cfg, forecast.scored_frame(m, holdout), a.version, a.run_id)
+        forecast.write(s, cfg, forecast.scored_frame(refit, frame), a.version, a.run_id, table="BASELINE_SITE_MONTH")
     print(json.dumps({"version": a.version, "gate": passed, **metrics}))
     return 0 if passed else 1
 

@@ -40,16 +40,17 @@ def predict_horizon(mv, hist: pd.DataFrame, horizon: int) -> pd.DataFrame:
     return frame[OUTPUT_COLUMNS].reset_index(drop=True)
 
 
-def backfill_frame(m, holdout: pd.DataFrame) -> pd.DataFrame:
-    """The held-out months scored by the fit that never saw them, with their actuals: the version's first rows with ground truth."""
-    out = holdout[HORIZON_COLUMNS].copy()
-    out["FORECAST_TONNES"] = _predict(m, holdout)
-    out["ACTUAL_TONNES"] = holdout[TARGET].astype(float)
+def scored_frame(m, rows: pd.DataFrame) -> pd.DataFrame:
+    """Rows with a known actual, scored by m: the held-out months by the fit that never saw them, or the training rows by the
+    refitted version as its monitor's baseline."""
+    out = rows[HORIZON_COLUMNS].copy()
+    out["FORECAST_TONNES"] = _predict(m, rows)
+    out["ACTUAL_TONNES"] = rows[TARGET].astype(float)
     return out[OUTPUT_COLUMNS].reset_index(drop=True)
 
 
-def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str) -> int:
-    """Merges rows into WORKSPACE.FORECAST_SITE_MONTH on (ROW_ID, MODEL_VERSION); a rerun rewrites, never duplicates."""
+def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str, table: str = "FORECAST_SITE_MONTH") -> int:
+    """Merges rows into WORKSPACE.<table> on (ROW_ID, MODEL_VERSION); a rerun rewrites, never duplicates."""
     staged = rows.copy()
     staged["ROW_ID"] = staged["SITE_ID"].astype(int).astype(str) + "-" + pd.to_datetime(staged["MONTH"]).dt.strftime("%Y-%m")
     staged["MODEL_VERSION"] = version
@@ -67,7 +68,7 @@ def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str) -
     )
     updates = ", ".join(f"t.{c} = s.{c}" for c in ("FORECAST_TONNES", "ACTUAL_TONNES", "LAG_1", "LAG_2", "LAG_3", "RUN_ID", "RUN_AT"))
     session.sql(
-        f"merge into {cfg.database}.WORKSPACE.FORECAST_SITE_MONTH t using ({source}) s "
+        f"merge into {cfg.database}.WORKSPACE.{table} t using ({source}) s "
         "on t.ROW_ID = s.ROW_ID and t.MODEL_VERSION = s.MODEL_VERSION "
         f"when matched then update set {updates} "
         f"when not matched then insert ({', '.join(cols)}) values ({', '.join('s.' + c for c in cols)})"
