@@ -13,7 +13,8 @@ What exists in each environment's ML database, who creates it, and what it holds
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
 | `FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
 | `MONTHLY_CYCLE` | task graph | DCM | the monthly cycle: `MONTHLY_START`, `MONTHLY_FORECAST_DEFAULT`, `MONTHLY_CHECK_DATA`, `MONTHLY_TRAIN`, `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`; started in prod only |
-| `JOB_RESULTS` | stage | DCM | the code bundle's result stage; empty, the jobs write to tables |
+| `JOB_RESULTS` | stage | DCM | the code bundle's result stage: one folder per job run, `LUCKML/<JOB>_<id>/`, holding the entry point's result (a few bytes); the jobs write their output to the tables, nothing reads this stage, purge it freely |
+| `IMAGES` | image repository | `LuckData-IaC-Snowflake-Horizon` | container images for a model served as a service; empty, the jobs run on Snowflake's ML runtime image |
 
 ```sql
 select SITE_ID, MONTH, FORECAST_TONNES, ACTUAL_TONNES, MODEL_VERSION
