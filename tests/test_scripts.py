@@ -23,7 +23,7 @@ def test_regression_gate_compares_the_candidate_with_the_default_and_raises():
     sql = (SCRIPTS / "regression.sql").read_text()
     assert '"is_default_version"' in sql
     assert "<% tolerance %>" in sql
-    assert re.search(r"RAISE \w+;", sql)
+    assert "RAISE" not in sql and "RETURN 'FAIL " in sql
     assert "no default to compare" in sql
 
 

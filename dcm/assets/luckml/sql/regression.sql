@@ -1,4 +1,5 @@
--- Refuses a candidate whose wape (weighted error) on the months with actuals is worse than the default version's by more than the tolerance.
+-- Compares a candidate's wape (weighted error) on the months with actuals to the default version's; returns a line starting with FAIL
+-- when it is worse by more than the tolerance, and the caller fails on it.
 -- Variables: db, version, tolerance (a fraction, 0.10 allows ten percent worse).
 EXECUTE IMMEDIATE $$
 DECLARE
@@ -6,7 +7,6 @@ DECLARE
   d STRING;
   candidate FLOAT;
   champion FLOAT;
-  regression EXCEPTION (-20001, 'the candidate is worse than the default version beyond the tolerance');
 BEGIN
   SHOW VERSIONS IN MODEL <% db %>.MODELS.SITE_TONNES_FORECAST;
   SELECT "name" INTO :d FROM TABLE(RESULT_SCAN(LAST_QUERY_ID())) WHERE "is_default_version" = TRUE;
@@ -24,7 +24,7 @@ BEGIN
     RETURN 'no common scored months between ' || v || ' and the default ' || d || ', ' || v || ' passes';
   END IF;
   IF (candidate > champion * (1 + <% tolerance %>)) THEN
-    RAISE regression;
+    RETURN 'FAIL ' || v || ' wape ' || ROUND(candidate, 4) || ' against the default ' || d || ' wape ' || ROUND(champion, 4) || ', beyond the tolerance';
   END IF;
   RETURN v || ' wape ' || ROUND(candidate, 4) || ' against the default ' || d || ' wape ' || ROUND(champion, 4) || ', passes';
 END;

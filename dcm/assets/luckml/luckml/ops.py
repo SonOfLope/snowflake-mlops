@@ -44,14 +44,13 @@ def log_run(session, cfg: Config, run_id: str, stage: str, version: str, passed:
 
 def gate(session, cfg: Config, version: str, run_id: str) -> None:
     run(session, "actuals", db=cfg.database)
-    try:
-        rows = run(session, "regression", db=cfg.database, version=version, tolerance=cfg.regression_tolerance)
-    except Exception as e:
-        log_run(session, cfg, run_id, "gate", version, False, {"error": str(e)[:500]})
-        raise
+    rows = run(session, "regression", db=cfg.database, version=version, tolerance=cfg.regression_tolerance)
     verdict = str(rows[0][0]) if rows else ""
     print(verdict)
-    log_run(session, cfg, run_id, "gate", version, True, {"verdict": verdict})
+    passed = not verdict.startswith("FAIL")
+    log_run(session, cfg, run_id, "gate", version, passed, {"verdict": verdict})
+    if not passed:
+        raise RuntimeError(verdict)
 
 
 def promote(session, cfg: Config, version: str, run_id: str) -> None:

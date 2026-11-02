@@ -8,17 +8,14 @@ SQL = Path(__file__).resolve().parents[1] / "dcm" / "assets" / "luckml" / "sql"
 
 
 class FakeSession:
-    def __init__(self, rows=None, fail_on=None):
+    def __init__(self, rows=None):
         self.statements = []
         self.params = []
         self.rows = rows or {}
-        self.fail_on = fail_on
 
     def sql(self, text, params=None):
         self.statements.append(text)
         self.params.append(params)
-        if self.fail_on and self.fail_on in text:
-            raise RuntimeError("the candidate is worse than the default version beyond the tolerance")
         self._last = text
         return self
 
@@ -49,9 +46,10 @@ def test_gate_refreshes_actuals_then_compares_with_the_configured_tolerance():
     assert any("1 + 0.1" in t for t in s.statements)
 
 
-def test_gate_failure_raises():
-    with pytest.raises(RuntimeError):
-        ops.gate(FakeSession(fail_on="RAISE"), config.load("dev"), "V9", "run9")
+def test_gate_failure_raises_with_the_numbers():
+    s = FakeSession(rows={"EXECUTE IMMEDIATE": [("FAIL V9 wape 0.25 against the default V8 wape 0.19, beyond the tolerance",)]})
+    with pytest.raises(RuntimeError, match="V9 wape 0.25"):
+        ops.gate(s, config.load("dev"), "V9", "run9")
 
 
 def test_promote_stops_when_verify_finds_no_rows():
@@ -90,7 +88,7 @@ def test_forecast_without_a_version_uses_the_default(monkeypatch):
 
 
 def test_gate_writes_its_run_log_row_even_when_it_fails():
-    s = FakeSession(fail_on="RAISE")
+    s = FakeSession(rows={"EXECUTE IMMEDIATE": [("FAIL V9 wape 0.25 against the default V8 wape 0.19, beyond the tolerance",)]})
     with pytest.raises(RuntimeError):
         ops.gate(s, config.load("dev"), "V9", "run9")
     logged = [p for t, p in zip(s.statements, s.params) if "insert into DEV_ML_DB.WORKSPACE.RUN_LOG" in t]

@@ -59,6 +59,8 @@ scripts/                       run_job.sql and job_output.sql, the pipeline's tw
 tests/                         unit tests, no Snowflake connection needed
 bootstrap/README.md            what to create in Azure DevOps and Snowflake before the first run
 docs/architecture.md           the diagram explained
+docs/runbook.md                what to do when a gate or an expectation fails, and how to roll back
+docs/objects.md                what exists in each environment and who creates it
 CONTRIBUTING.md                how a change is made and reaches an environment
 features/README.md             the feature store project
 img/                           the lifecycle, quality gates and sign-in diagrams, editable in draw.io
