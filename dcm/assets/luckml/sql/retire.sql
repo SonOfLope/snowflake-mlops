@@ -1,4 +1,4 @@
--- Retires every version except the default and the newest ones: its monitor, then its views, then the version.
+-- Retires every version except the default and the newest ones: its monitor, then its view and baseline table, then the version.
 -- Forecast rows stay as history. Variables: db, keep.
 EXECUTE IMMEDIATE $$
 DECLARE
@@ -13,7 +13,7 @@ BEGIN
   FOR r IN c DO
     EXECUTE IMMEDIATE 'DROP MODEL MONITOR IF EXISTS <% db %>.MODELS.SITE_TONNES_FORECAST_' || r.v || '_MON';
     EXECUTE IMMEDIATE 'DROP VIEW IF EXISTS <% db %>.WORKSPACE.FORECAST_' || r.v;
-    EXECUTE IMMEDIATE 'DROP VIEW IF EXISTS <% db %>.WORKSPACE.BASELINE_' || r.v;
+    EXECUTE IMMEDIATE 'DROP TABLE IF EXISTS <% db %>.WORKSPACE.BASELINE_' || r.v;
     EXECUTE IMMEDIATE 'ALTER MODEL <% db %>.MODELS.SITE_TONNES_FORECAST DROP VERSION ' || r.v;
     retired := retired || r.v || ' ';
   END FOR;

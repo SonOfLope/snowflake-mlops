@@ -33,10 +33,11 @@ def test_regression_gate_compares_weighted_errors():
     assert "wape" in sql
 
 
-def test_monitor_has_a_baseline_view_of_the_versions_training_rows():
+def test_monitor_snapshots_the_versions_training_rows_as_its_baseline_table():
     sql = (SCRIPTS / "monitor.sql").read_text()
-    assert re.search(r"CREATE OR REPLACE VIEW <% db %>\.WORKSPACE\.BASELINE_<% version %> AS\s+SELECT \* FROM <% db %>\.WORKSPACE\.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>'", sql)
+    assert re.search(r"CREATE OR REPLACE TABLE <% db %>\.WORKSPACE\.BASELINE_<% version %> AS\s+SELECT \* FROM <% db %>\.WORKSPACE\.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>'", sql)
     assert re.search(r"BASELINE = <% db %>\.WORKSPACE\.BASELINE_<% version %>\s", sql)
+    assert "CREATE OR REPLACE VIEW <% db %>.WORKSPACE.BASELINE_" not in sql   # a monitor clones its baseline, a view cannot be cloned
 
 
 def test_verify_counts_the_versions_baseline_rows():
