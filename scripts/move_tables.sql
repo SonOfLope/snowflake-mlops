@@ -1,7 +1,8 @@
--- One release: the forecast tables move from WORKSPACE to SALES_FORECASTING with their rows. Each table leaves the project's
--- management first (its data metric attachments too), so the deploy that follows adopts it at the new name, adds the MODEL
--- column and attaches the checks again. The old names stay as views for the monitors of the versions promoted before.
--- Does nothing once the tables have moved. Variables: db.
+-- One release: the forecast tables move from WORKSPACE to SALES_FORECASTING with their rows, as a copy, since a table cannot
+-- be renamed out of a managed access schema by its owner. Each table leaves the project's management first (its data metric
+-- attachments too), so the deploy that follows adopts the copy at the new name, adds the MODEL column and attaches the checks
+-- again. The old names stay as views for the monitors of the versions promoted before. Does nothing once the tables have
+-- moved, and tolerates a table already released by an earlier attempt. Variables: db.
 EXECUTE IMMEDIATE $$
 DECLARE
   moved STRING DEFAULT '';
@@ -21,16 +22,12 @@ ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.DUPLICATE_COUNT
   ON (ROW_ID, MODEL_VERSION)
   EXPECTATION ONE_ROW_PER_VERSION_SITE_MONTH (VALUE = 0);
 ') INTO :released;
-    IF (released <> 2) THEN
-      RETURN 'FAIL the project released ' || released || ' of the 2 data metric attachments of FORECAST_SITE_MONTH, nothing moved';
+    IF (released = 1) THEN
+      RETURN 'FAIL the project released one of the two data metric attachments of FORECAST_SITE_MONTH, nothing moved';
     END IF;
     SELECT SYSTEM$UNMANAGE_ENTITY_FROM_DCM_PROJECT('<% db %>.WORKSPACE.MLOPS', 'TABLE', '<% db %>.WORKSPACE.FORECAST_SITE_MONTH') INTO :released;
-    IF (released <> 1) THEN
-      RETURN 'FAIL the project did not release FORECAST_SITE_MONTH, nothing moved';
-    END IF;
-    ALTER TABLE <% db %>.WORKSPACE.FORECAST_SITE_MONTH DROP DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_COUNT ON (FORECAST_TONNES);
-    ALTER TABLE <% db %>.WORKSPACE.FORECAST_SITE_MONTH DROP DATA METRIC FUNCTION SNOWFLAKE.CORE.DUPLICATE_COUNT ON (ROW_ID, MODEL_VERSION);
-    ALTER TABLE <% db %>.WORKSPACE.FORECAST_SITE_MONTH RENAME TO <% db %>.SALES_FORECASTING.SITE_MONTH_FORECAST;
+    CREATE TABLE <% db %>.SALES_FORECASTING.SITE_MONTH_FORECAST AS SELECT * FROM <% db %>.WORKSPACE.FORECAST_SITE_MONTH;
+    DROP TABLE <% db %>.WORKSPACE.FORECAST_SITE_MONTH;
     CREATE VIEW <% db %>.WORKSPACE.FORECAST_SITE_MONTH AS SELECT * FROM <% db %>.SALES_FORECASTING.SITE_MONTH_FORECAST;
     moved := moved || 'FORECAST_SITE_MONTH ';
   END IF;
@@ -38,10 +35,8 @@ ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.DUPLICATE_COUNT
     WHERE TABLE_SCHEMA = 'WORKSPACE' AND TABLE_NAME = 'BASELINE_SITE_MONTH' AND TABLE_TYPE = 'BASE TABLE';
   IF (present = 1) THEN
     SELECT SYSTEM$UNMANAGE_ENTITY_FROM_DCM_PROJECT('<% db %>.WORKSPACE.MLOPS', 'TABLE', '<% db %>.WORKSPACE.BASELINE_SITE_MONTH') INTO :released;
-    IF (released <> 1) THEN
-      RETURN 'FAIL the project did not release BASELINE_SITE_MONTH, nothing moved';
-    END IF;
-    ALTER TABLE <% db %>.WORKSPACE.BASELINE_SITE_MONTH RENAME TO <% db %>.SALES_FORECASTING.SITE_MONTH_BASELINE;
+    CREATE TABLE <% db %>.SALES_FORECASTING.SITE_MONTH_BASELINE AS SELECT * FROM <% db %>.WORKSPACE.BASELINE_SITE_MONTH;
+    DROP TABLE <% db %>.WORKSPACE.BASELINE_SITE_MONTH;
     CREATE VIEW <% db %>.WORKSPACE.BASELINE_SITE_MONTH AS SELECT * FROM <% db %>.SALES_FORECASTING.SITE_MONTH_BASELINE;
     moved := moved || 'BASELINE_SITE_MONTH ';
   END IF;
