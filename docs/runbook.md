@@ -15,8 +15,9 @@ The same code trained on test data produced a challenger worse than test's defau
 
 1. Read the verdict. The gate step log and `RUN_LOG` (`STAGE = 'gate'`) carry the line `FAIL V<build> wape 0.25 against the default V<n> wape 0.19, beyond the tolerance`.
 2. Compare the two versions' held-out metrics, both trained on test data: `METRICS` of their training rows in `RUN_LOG`, or the version's Overview in Snowsight. A large `bias` points at a feature change; a `p90_ape` jump points at a few sites.
-3. Compare the data dev and test trained on: months present, rows per month, the newest month. At Luck, test is a refreshed clone of prod and dev may lag; a stale source on either side explains most differences.
-4. Decide:
+3. Open `notebooks/regression_eda.ipynb` in the Workspace with the environment and the two versions; it does steps 2 and 3 in depth, site by site and month by month.
+4. Compare the data dev and test trained on: months present, rows per month, the newest month. At Luck, test is a refreshed clone of prod and dev may lag; a stale source on either side explains most differences.
+5. Decide:
    - **Data was wrong.** Fix the source, then run the pipeline again from `main` (a rerun of the failed stage reuses the version already trained and fails the same way; a new run trains a new one).
    - **The change is worse on test data.** It does not ship. Revert or improve it and open a new pull request. Dev's default already moved to the challenger; that is dev, and it moves again with the next one.
    - **Marginal loss on a small holdout.** Three months by a few sites is noise-prone. Do not loosen the tolerance for one change; widen `eval_months` if the window is too short.

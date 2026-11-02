@@ -23,3 +23,4 @@ Work happens on a branch, in a Snowsight Workspace opened from this repository, 
 - A version is named by the pipeline, `V<build id>`. Experiment versions carry the `VEXP_` prefix.
 - A change to a feature view that alters its columns is a new feature view version.
 - `main` is protected. Pull requests only.
+- Notebooks live in `notebooks/`, with outputs cleared, and are never run by the pipeline.

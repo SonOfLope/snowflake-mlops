@@ -9,7 +9,7 @@ trigger:
   branches:
     include: [main]
   paths:
-    exclude: [docs/*, img/*, bootstrap/*, '*.md']
+    exclude: [docs/*, img/*, bootstrap/*, notebooks/*, '*.md']
 
 # Pipeline variables set on the definition, never in this file: serviceConnectionDev, serviceConnectionTest,
 # serviceConnectionProd, snowflakeAccount, agentPool. See bootstrap/README.md.
