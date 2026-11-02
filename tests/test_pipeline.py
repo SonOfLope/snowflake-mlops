@@ -110,10 +110,10 @@ def test_the_move_runs_once_before_the_deploy_and_keeps_the_old_names_for_earlie
     template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
     assert template.index("scripts/move_tables.sql") < template.index("snow dcm deploy")
     sql = (PIPELINE.parent / "scripts" / "move_tables.sql").read_text()
-    assert "SYSTEM$UNMANAGE_FROM_DCM_PROJECT" in sql and "DROP DATA METRIC FUNCTION" in sql
+    assert "SYSTEM$UNMANAGE_FROM_DCM_PROJECT" in sql and "RENAME TO" not in sql   # a table cannot leave a managed access schema by rename
     for old, new in (("FORECAST_SITE_MONTH", "SITE_MONTH_FORECAST"), ("BASELINE_SITE_MONTH", "SITE_MONTH_BASELINE")):
-        assert f"RENAME TO <% db %>.SALES_FORECASTING.{new}" in sql
-        assert f"CREATE VIEW <% db %>.WORKSPACE.{old}" in sql
+        copy = f"CREATE TABLE <% db %>.SALES_FORECASTING.{new} AS SELECT * FROM <% db %>.WORKSPACE.{old}"
+        assert copy in sql and sql.index(copy) < sql.index(f"DROP TABLE <% db %>.WORKSPACE.{old}") < sql.index(f"CREATE VIEW <% db %>.WORKSPACE.{old}")
 
 
 def test_every_environment_names_the_family_schema():
