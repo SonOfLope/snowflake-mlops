@@ -1,3 +1,9 @@
+parameters:
+  - name: retrainProd
+    displayName: Train, gate and promote a challenger in prod (dev and test always do)
+    type: boolean
+    default: false
+
 trigger:
   batch: true
   branches:
@@ -84,3 +90,4 @@ stages:
                     env: prod
                     db: PROD_ML_DB
                     serviceConnection: $(serviceConnectionProd)
+                    retrain: ${{ parameters.retrainProd }}

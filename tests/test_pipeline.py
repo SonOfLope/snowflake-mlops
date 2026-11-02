@@ -39,7 +39,7 @@ def test_every_environment_trains_its_own_challenger_then_forecasts_gates_and_pr
     text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
     names = [n.split(" (")[0] for n in re.findall(r"displayName:\s*(.+)", text)]
     assert names[-4:] == ["Train", "Forecast", "Regression gate", "Promote"]
-    assert "${{ if" not in text and "previousDb" not in text and "modelVersion" not in text
+    assert text.count("${{ if") == 1 and "previousDb" not in text and "modelVersion" not in text
     assert "promote.sql" not in text
 
 
@@ -110,3 +110,16 @@ def test_run_log_keeps_every_metric():
     run_log = definitions[definitions.index("DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG"):]
     run_log = run_log[: run_log.index(";")]
     assert "WAPE NUMBER(9,4)" in run_log and "METRICS VARIANT" in run_log
+
+
+def test_prod_retrains_only_when_asked_dev_and_test_always():
+    text = PIPELINE.read_text()
+    params = yaml.safe_load(text)["parameters"]
+    retrain = next(p for p in params if p["name"] == "retrainProd")
+    assert retrain["type"] == "boolean" and retrain["default"] is False
+    stages = {s["stage"]: yaml.safe_dump(s) for s in _stages()}
+    assert "retrain: ${{ parameters.retrainProd }}" in stages["Prod"]
+    assert "retrain:" not in stages["Dev"] and "retrain:" not in stages["Test"]
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert "${{ if eq(parameters.retrain, true) }}" in template
+    assert template.index("${{ if eq(parameters.retrain, true) }}") < template.index("displayName: Train")
