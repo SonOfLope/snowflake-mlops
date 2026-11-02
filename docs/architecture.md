@@ -14,6 +14,8 @@ A branch and a pull request (A1) run `Validate` through the branch policy on `ma
 
 ## B1 and B2, one identity per environment
 
+![How a step signs in](../img/identity-sequence.png)
+
 Each stage is a deployment job on its own Azure DevOps environment and signs in through its own service connection. The connection's federated token (B1) is presented to Snowflake as `SVC_MLOPS_<ENV>`, a service user that holds `RBAC_ML_DEPLOYER_<ENV>` and nothing else. No key pair, no secret, nothing to rotate. The dev identity cannot read `TEST_ML_DB`; the boundary proof below shows the refusal.
 
 Under that role the stage runs the same steps (B2): `snow dcm deploy` for the `WORKSPACE` view, tables and stage; `snow feature apply` for the feature view in `FEATURES`; the version (trained in dev as an ML Job on `ML_CPU_POOL`, copied elsewhere); the batch forecast as a second ML Job; `actuals.sql`, which writes the closed months' actuals onto every version's rows, and `regression.sql`, which refuses a candidate whose MAPE on those months is worse than the current default's beyond a tolerance; `verify.sql` and the monitor; `set_default.sql`, so each environment's default is its last version that passed.

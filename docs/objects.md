@@ -11,8 +11,8 @@ What exists in each environment's ML database, who creates it, and what it holds
 | `FORECAST_SITE_MONTH` | table | DCM, filled by the forecast job | one row per site, month and model version |
 | `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run |
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
-| `CODE` | stage | DCM | the code bundle's result stage |
 | `FORECAST_V<n>` | view | `scripts/monitor.sql` | the rows of version `V<n>` only, the source of its monitor |
+| `JOB_RESULTS` | stage | DCM | the code bundle's result stage; empty, the jobs write to tables |
 
 ```sql
 select SITE_ID, MONTH, FORECAST_TONNES, ACTUAL_TONNES, MODEL_VERSION
@@ -51,6 +51,24 @@ select * from table(MODEL_MONITOR_PERFORMANCE_METRIC(
   'PROD_ML_DB.MODELS.SITE_TONNES_FORECAST_V118_MON', 'MAPE', '1 month', '2026-06-01'::timestamp_ntz, current_timestamp()::timestamp_ntz));
 ```
 
-## Growth
+## Growth and cleanup
 
-Each pipeline run adds a model version, a `FORECAST_V<n>` view, a monitor and 48 forecast rows per environment. Nothing removes old ones yet; retiring versions that are neither the default nor the one before it is a cleanup to add.
+Each pipeline run adds, per environment, a model version, a `FORECAST_V<n>` view, a monitor, and one set of forecast rows for that version. Nothing removes them automatically.
+
+Retire a version only when it is neither the environment's default nor the one before it, so a rollback stays possible. Check the default first:
+
+```sql
+show versions in model PROD_ML_DB.MODELS.SITE_TONNES_FORECAST;   -- is_default_version
+```
+
+Then, as `RBAC_ML_DEPLOYER_<ENV>`, in this order:
+
+```sql
+drop model monitor PROD_ML_DB.MODELS.SITE_TONNES_FORECAST_V92_MON;
+drop view PROD_ML_DB.WORKSPACE.FORECAST_V92;
+alter model PROD_ML_DB.MODELS.SITE_TONNES_FORECAST drop version V92;
+-- optional: the rows are history and cost little to keep
+delete from PROD_ML_DB.WORKSPACE.FORECAST_SITE_MONTH where MODEL_VERSION = 'V92';
+```
+
+The monitor reads the view, so it goes first. A version that is the default cannot be dropped.

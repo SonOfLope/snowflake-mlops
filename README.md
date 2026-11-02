@@ -28,7 +28,7 @@ bootstrap/README.md            what to create in Azure DevOps and Snowflake befo
 docs/architecture.md           the diagram explained
 CONTRIBUTING.md                how a change is made and reaches an environment
 features/README.md             the feature store project
-img/                           the lifecycle and quality gates diagrams, editable in draw.io
+img/                           the lifecycle, quality gates and sign-in diagrams, editable in draw.io
 ```
 
 ## Local run
