@@ -9,6 +9,7 @@ def test_load_dev_config():
     assert cfg.role == "RBAC_ML_DEPLOYER_DEV"
     assert cfg.gate_wape_max == 0.4
     assert cfg.regression_tolerance == 0.10
+    assert cfg.risk_threshold == 0.20
 
 
 def test_unknown_env_raises():

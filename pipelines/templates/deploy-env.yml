@@ -5,6 +5,9 @@ parameters:
     type: string
   - name: serviceConnection
     type: string
+  - name: retrain
+    type: boolean
+    default: true
 
 # One environment, the same steps everywhere: schema objects, the code bundle and the monthly task graph; feature views;
 # then a challenger trained on this environment's data, forecast, gated against the environment's default, and promoted.
@@ -23,6 +26,16 @@ steps:
         snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber)"
   - template: snow-step.yml
     parameters:
+      displayName: Data expectations (${{ parameters.env }})
+      retry: 0
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        cd dcm
+        snow dcm test "${CONN[@]}" --target ${{ parameters.env }}
+  - template: snow-step.yml
+    parameters:
       displayName: Feature store plan and apply (${{ parameters.env }})
       serviceConnection: ${{ parameters.serviceConnection }}
       user: SVC_MLOPS_${{ upper(parameters.env) }}
@@ -36,49 +49,50 @@ steps:
         fi
         snow feature plan "${CONN[@]}" "${FS[@]}"
         snow feature apply "${CONN[@]}" "${FS[@]}"
-  - template: snow-step.yml
-    parameters:
-      displayName: Train (${{ parameters.env }})
-      retry: 0
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        rc=0
-        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-        snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=train 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
-        exit $rc
-  - template: snow-step.yml
-    parameters:
-      displayName: Forecast (${{ parameters.env }})
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        rc=0
-        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-        snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=forecast 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
-        exit $rc
-  - template: snow-step.yml
-    parameters:
-      displayName: Regression gate (${{ parameters.env }})
-      retry: 0
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        rc=0
-        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=gate -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-        snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=gate 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
-        exit $rc
-  - template: snow-step.yml
-    parameters:
-      displayName: Promote (${{ parameters.env }})
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        rc=0
-        snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=promote -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-        snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=promote 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
-        exit $rc
+  - ${{ if eq(parameters.retrain, true) }}:
+    - template: snow-step.yml
+      parameters:
+        displayName: Train (${{ parameters.env }})
+        retry: 0
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          rc=0
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=train 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          exit $rc
+    - template: snow-step.yml
+      parameters:
+        displayName: Forecast (${{ parameters.env }})
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          rc=0
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=forecast 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          exit $rc
+    - template: snow-step.yml
+      parameters:
+        displayName: Regression gate (${{ parameters.env }})
+        retry: 0
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          rc=0
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=gate -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=gate 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          exit $rc
+    - template: snow-step.yml
+      parameters:
+        displayName: Promote (${{ parameters.env }})
+        serviceConnection: ${{ parameters.serviceConnection }}
+        user: SVC_MLOPS_${{ upper(parameters.env) }}
+        role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+        script: |
+          rc=0
+          snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=promote -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=promote 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          exit $rc

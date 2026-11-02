@@ -9,6 +9,7 @@ feature_view: SITE_MONTHLY_TONNES
 feature_view_version: "1"
 gate_wape_max: 0.4
 regression_tolerance: 0.10
+risk_threshold: 0.20
 horizon_months: 3
 eval_months: 3
 retire_enabled: false

@@ -19,7 +19,7 @@ def main(argv=None) -> int:
     p.add_argument("--run-id", required=True)
     a = p.parse_args(argv)
     cfg = config.load(a.env)
-    ops.gate(session.connect(cfg), cfg, a.version)
+    ops.gate(session.connect(cfg), cfg, a.version, a.run_id)
     return 0
 
 

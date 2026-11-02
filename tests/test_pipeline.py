@@ -39,7 +39,7 @@ def test_every_environment_trains_its_own_challenger_then_forecasts_gates_and_pr
     text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
     names = [n.split(" (")[0] for n in re.findall(r"displayName:\s*(.+)", text)]
     assert names[-4:] == ["Train", "Forecast", "Regression gate", "Promote"]
-    assert "${{ if" not in text and "previousDb" not in text and "modelVersion" not in text
+    assert text.count("${{ if") == 1 and "previousDb" not in text and "modelVersion" not in text
     assert "promote.sql" not in text
 
 
@@ -110,3 +110,33 @@ def test_run_log_keeps_every_metric():
     run_log = definitions[definitions.index("DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG"):]
     run_log = run_log[: run_log.index(";")]
     assert "WAPE NUMBER(9,4)" in run_log and "METRICS VARIANT" in run_log
+
+
+def test_prod_retrains_only_when_asked_dev_and_test_always():
+    text = PIPELINE.read_text()
+    params = yaml.safe_load(text)["parameters"]
+    retrain = next(p for p in params if p["name"] == "retrainProd")
+    assert retrain["type"] == "boolean" and retrain["default"] is False
+    stages = {s["stage"]: yaml.safe_dump(s) for s in _stages()}
+    assert "retrain: ${{ parameters.retrainProd }}" in stages["Prod"]
+    assert "retrain:" not in stages["Dev"] and "retrain:" not in stages["Test"]
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert "${{ if eq(parameters.retrain, true) }}" in template
+    assert template.index("${{ if eq(parameters.retrain, true) }}") < template.index("displayName: Train")
+
+
+def test_data_expectations_are_declared_scheduled_and_checked_before_training():
+    root = PIPELINE.parent / "dcm"
+    quality = (root / "sources" / "definitions" / "quality.sql").read_text()
+    for name in ("PREVIOUS_MONTH_PRESENT", "ENOUGH_HISTORY", "NO_NULL_TONNES", "NO_NEGATIVE_TONNES",
+                 "ONE_ROW_PER_SITE_MONTH", "NO_NULL_FORECAST", "ONE_ROW_PER_VERSION_SITE_MONTH"):
+        assert f"EXPECTATION {name} (" in quality
+    workspace = (root / "sources" / "definitions" / "workspace.sql").read_text()
+    assert workspace.count("DATA_METRIC_SCHEDULE = '{{ dq_schedule }}'") == 2
+    defaults = yaml.safe_load((root / "manifest.yml").read_text())["templating"]["defaults"]
+    assert {"dq_schedule", "max_source_age_seconds", "min_source_rows"} <= set(defaults)
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert template.index("snow dcm deploy") < template.index("snow dcm test") < template.index("displayName: Train")
+    cycle = (root / "sources" / "definitions" / "cycle.sql").read_text()
+    assert "MONTHLY_CHECK_DATA" in cycle and "TEST ALL" in cycle
+    assert "DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_TRAIN\n  AFTER {{ db }}.WORKSPACE.MONTHLY_CHECK_DATA" in cycle

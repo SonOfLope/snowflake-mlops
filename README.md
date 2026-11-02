@@ -8,12 +8,28 @@ The monthly site tonnes forecast as code on Snowflake. A small Python package tr
 
 1. **Experiment in dev.** An AI engineer works directly in `DEV_ML_DB` as `FR_AI_ENGINEER`, from a Workspace notebook or an IDE, and logs as many versions as the work needs. Nothing here touches `main`.
 2. **Pull request.** The candidate's code goes on a branch. The branch policy runs the `Validate` stage: `ruff`, `pytest`, `snow dcm plan` and `snow feature plan` against dev, signed in as `SVC_MLOPS_DEV`.
-3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects, the code bundle and the monthly task graph (DCM) and the feature views, then runs four jobs on `ML_CPU_POOL`: **train** a challenger `V<build>` on dev data (held-out weighted error under `gate_wape_max`, else nothing is logged), **forecast** with it, **gate** it against dev's current default on the months with actuals, **promote** it (verify, monitor, make it the default, retire old versions when enabled).
+3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects, the code bundle and the monthly task graph (DCM) and the feature views, then runs four jobs on `ML_CPU_POOL`: **train** a challenger `V<build>` on dev data (scored on the last three months held out, weighted error under `gate_wape_max`, else nothing is logged; the version logged is refitted on the full history), **forecast** with it, **gate** it against dev's current default on the months with actuals, **promote** it (verify, monitor, make it the default, retire old versions when enabled).
 4. **Test.** The same steps on `TEST_ML_DB` with test data. Test proves the reviewed code trains, forecasts and passes the gates on a second dataset.
 5. **Prod.** After the approval on the `LuckData-Snowflake-MLOps-prod` environment, the same steps on `PROD_ML_DB` with production data. The default version in prod is what production code calls; it moves only when a challenger passes the regression gate there.
+A merge trains in dev and test every time, and in prod only when the run is queued with `retrainProd` set to true; by default prod receives the code, the objects and the feature views and keeps its model until the monthly cycle or a run someone asked for. Set the parameter when the merge changes the model or its features.
 6. **Every month, in prod.** The task graph `PROD_ML_DB.WORKSPACE.MONTHLY_CYCLE` forecasts the next months with the current default, then trains a challenger `M<yyyymmddhhmi>` on the latest data, forecasts, gates and promotes it with the same jobs. A challenger that loses leaves the champion in place. The graph is declared in every environment and started only in prod.
 
 `docs/architecture.md` walks the diagram journey by journey.
+
+## Data quality
+
+The source view and the forecast table carry data metric functions with expectations, declared in `dcm/sources/definitions/quality.sql` and deployed with the objects. `snow dcm test` evaluates them right after each deploy and the monthly graph evaluates them before training, so a missing month, a dropped site, a null or a duplicate stops the run with the failed expectation named, before any model is touched. Snowflake also evaluates them on `dq_schedule` and shows the history on each object's Data Quality tab in Snowsight.
+
+| Expectation | On | Means |
+|---|---|---|
+| `PREVIOUS_MONTH_PRESENT` | `SRC_SITE_MONTH` | the newest month is younger than `max_source_age_seconds` |
+| `ENOUGH_HISTORY` | `SRC_SITE_MONTH` | at least `min_source_rows` rows |
+| `NO_NULL_TONNES`, `NO_NEGATIVE_TONNES` | `SRC_SITE_MONTH` | tonnes present and not negative |
+| `ONE_ROW_PER_SITE_MONTH` | `SRC_SITE_MONTH` | no duplicate site and month |
+| `NO_NULL_FORECAST` | `FORECAST_SITE_MONTH` | every row has a forecast |
+| `ONE_ROW_PER_VERSION_SITE_MONTH` | `FORECAST_SITE_MONTH` | a version never writes a site month twice |
+
+To add a check, attach a system metric or your own `DEFINE DATA METRIC FUNCTION` to the column in `quality.sql`, name the expectation, and put any threshold that differs per environment in `dcm/manifest.yml`. The next deploy attaches it and the next test evaluates it.
 
 ## Metrics
 
@@ -26,7 +42,7 @@ Every training run scores the challenger on the held-out months, on rows with a 
 | `bias` | sum of signed errors over sum of actuals; positive means over-forecast | reported |
 | `median_ape`, `p90_ape` | the middle and the worst tenth of the per-row errors | reported |
 | `rmse` | root mean squared error, in tonnes | reported |
-| `stockout_rate`, `excess_rate` | share of rows under-forecast, or over-forecast, by more than 20 percent | reported |
+| `stockout_rate`, `excess_rate` | share of rows under-forecast, or over-forecast, by more than `risk_threshold` (20 percent) | reported |
 | `persistence_wape`, `seasonal_naive_wape` | the error of the trailing three-month average and of the same month last year, on the same rows | reported; a model that does not beat them is not earning its keep |
 
 A metric becomes blocking only when the business decides a release should stop on it; until then it is a number people read, and an alert can watch.
@@ -43,6 +59,9 @@ scripts/                       run_job.sql and job_output.sql, the pipeline's tw
 tests/                         unit tests, no Snowflake connection needed
 bootstrap/README.md            what to create in Azure DevOps and Snowflake before the first run
 docs/architecture.md           the diagram explained
+docs/runbook.md                what to do when a gate or an expectation fails, and how to roll back
+docs/objects.md                what exists in each environment and who creates it
+notebooks/                     analysis people run by hand, the regression notebook first; never deployed
 CONTRIBUTING.md                how a change is made and reaches an environment
 features/README.md             the feature store project
 img/                           the lifecycle, quality gates and sign-in diagrams, editable in draw.io

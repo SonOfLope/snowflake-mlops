@@ -1,5 +1,6 @@
 """The environment steps around a model version, run from the bundle's sql/ scripts by the pipeline and the task graph."""
 
+import json
 from pathlib import Path
 
 from luckml.config import Config
@@ -33,17 +34,35 @@ def run(session, name: str, **values) -> list:
     return rows
 
 
-def gate(session, cfg: Config, version: str) -> None:
+def log_run(session, cfg: Config, run_id: str, stage: str, version: str, passed: bool, detail: dict) -> None:
+    session.sql(
+        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, GATE_PASSED, METRICS, RUN_AT) "
+        "select ?, ?, ?, ?, parse_json(?), current_timestamp()",
+        params=[run_id, stage, version, passed, json.dumps(detail)],
+    ).collect()
+
+
+def gate(session, cfg: Config, version: str, run_id: str) -> None:
     run(session, "actuals", db=cfg.database)
-    print(run(session, "regression", db=cfg.database, version=version, tolerance=cfg.regression_tolerance))
+    rows = run(session, "regression", db=cfg.database, version=version, tolerance=cfg.regression_tolerance)
+    verdict = str(rows[0][0]) if rows else ""
+    print(verdict)
+    passed = not verdict.startswith("FAIL")
+    log_run(session, cfg, run_id, "gate", version, passed, {"verdict": verdict})
+    if not passed:
+        raise RuntimeError(verdict)
 
 
-def promote(session, cfg: Config, version: str) -> None:
+def promote(session, cfg: Config, version: str, run_id: str) -> None:
     row = run(session, "verify", db=cfg.database, version=version)[0]
-    print({k: row[k] for k in ("FORECAST_ROWS", "NULL_FORECASTS", "VERSION_PRESENT")})
+    checks = {k: row[k] for k in ("FORECAST_ROWS", "NULL_FORECASTS", "VERSION_PRESENT")}
+    print(checks)
     if row["FORECAST_ROWS"] == 0 or row["NULL_FORECASTS"] > 0 or row["VERSION_PRESENT"] == 0:
+        log_run(session, cfg, run_id, "promote", version, False, checks)
         raise RuntimeError(f"{version} failed verification")
     run(session, "monitor", db=cfg.database, version=version, wh=cfg.warehouse)
     run(session, "set_default", db=cfg.database, version=version)
-    if cfg.retire_enabled:
-        print(run(session, "retire", db=cfg.database, keep=cfg.retain_versions))
+    retired = run(session, "retire", db=cfg.database, keep=cfg.retain_versions) if cfg.retire_enabled else []
+    if retired:
+        print(retired)
+    log_run(session, cfg, run_id, "promote", version, True, {**checks, "retired": str(retired[0][0]) if retired else "disabled"})

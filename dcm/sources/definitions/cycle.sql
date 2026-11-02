@@ -1,6 +1,7 @@
 -- The monthly cycle in each environment, one graph run per month after close. The version trained in a run is
 -- M<yyyymmddhhmi> of the run's scheduled time, the same in every task of that run.
--- The champion forecasts first; the challenger is trained, forecast, gated against the champion and promoted if it passes.
+-- The champion forecasts first; the data expectations are checked; the challenger is trained, forecast, gated against the
+-- champion and promoted if it passes.
 
 DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_START
 AS
@@ -18,8 +19,13 @@ BEGIN
 END;
 $$;
 
-DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_TRAIN
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_CHECK_DATA
   AFTER {{ db }}.WORKSPACE.MONTHLY_START
+AS
+EXECUTE DCM PROJECT {{ db }}.WORKSPACE.MLOPS TEST ALL;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_TRAIN
+  AFTER {{ db }}.WORKSPACE.MONTHLY_CHECK_DATA
 AS
 EXECUTE IMMEDIATE $$
 BEGIN

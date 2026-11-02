@@ -1,9 +1,15 @@
+parameters:
+  - name: retrainProd
+    displayName: Train, gate and promote a challenger in prod (dev and test always do)
+    type: boolean
+    default: false
+
 trigger:
   batch: true
   branches:
     include: [main]
   paths:
-    exclude: [docs/*, img/*, bootstrap/*, '*.md']
+    exclude: [docs/*, img/*, bootstrap/*, notebooks/*, '*.md']
 
 # Pipeline variables set on the definition, never in this file: serviceConnectionDev, serviceConnectionTest,
 # serviceConnectionProd, snowflakeAccount, agentPool. See bootstrap/README.md.
@@ -84,3 +90,4 @@ stages:
                     env: prod
                     db: PROD_ML_DB
                     serviceConnection: $(serviceConnectionProd)
+                    retrain: ${{ parameters.retrainProd }}
