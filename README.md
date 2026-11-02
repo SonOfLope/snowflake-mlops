@@ -16,6 +16,21 @@ A merge trains in dev and test every time, and in prod only when the run is queu
 
 `docs/architecture.md` walks the diagram journey by journey.
 
+## Data quality
+
+The source view and the forecast table carry data metric functions with expectations, declared in `dcm/sources/definitions/quality.sql` and deployed with the objects. `snow dcm test` evaluates them right after each deploy and the monthly graph evaluates them before training, so a missing month, a dropped site, a null or a duplicate stops the run with the failed expectation named, before any model is touched. Snowflake also evaluates them on `dq_schedule` and shows the history on each object's Data Quality tab in Snowsight.
+
+| Expectation | On | Means |
+|---|---|---|
+| `PREVIOUS_MONTH_PRESENT` | `SRC_SITE_MONTH` | the newest month is younger than `max_source_age_seconds` |
+| `ENOUGH_HISTORY` | `SRC_SITE_MONTH` | at least `min_source_rows` rows |
+| `NO_NULL_TONNES`, `NO_NEGATIVE_TONNES` | `SRC_SITE_MONTH` | tonnes present and not negative |
+| `ONE_ROW_PER_SITE_MONTH` | `SRC_SITE_MONTH` | no duplicate site and month |
+| `NO_NULL_FORECAST` | `FORECAST_SITE_MONTH` | every row has a forecast |
+| `ONE_ROW_PER_VERSION_SITE_MONTH` | `FORECAST_SITE_MONTH` | a version never writes a site month twice |
+
+To add a check, attach a system metric or your own `DEFINE DATA METRIC FUNCTION` to the column in `quality.sql`, name the expectation, and put any threshold that differs per environment in `dcm/manifest.yml`. The next deploy attaches it and the next test evaluates it.
+
 ## Metrics
 
 Every training run scores the challenger on the held-out months, on rows with a positive actual, and stores the result with the version in the registry and in `RUN_LOG.METRICS`. Two numbers block, the rest inform.

@@ -7,12 +7,12 @@ What exists in each environment's ML database, who creates it, and what it holds
 | Object | Kind | Created by | Holds |
 |---|---|---|---|
 | `MLOPS` | DCM project | `snow dcm create` | the deployment history of everything DCM declares |
-| `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH` |
+| `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH`; carries the data expectations on the source |
 | `FORECAST_SITE_MONTH` | table | DCM, filled by the forecast job | one row per site, month and model version |
 | `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
 | `FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
-| `MONTHLY_CYCLE` | task graph | DCM | the monthly cycle: `MONTHLY_START`, `MONTHLY_FORECAST_DEFAULT`, `MONTHLY_TRAIN`, `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`; started in prod only |
+| `MONTHLY_CYCLE` | task graph | DCM | the monthly cycle: `MONTHLY_START`, `MONTHLY_FORECAST_DEFAULT`, `MONTHLY_CHECK_DATA`, `MONTHLY_TRAIN`, `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`; started in prod only |
 | `JOB_RESULTS` | stage | DCM | the code bundle's result stage; empty, the jobs write to tables |
 
 ```sql

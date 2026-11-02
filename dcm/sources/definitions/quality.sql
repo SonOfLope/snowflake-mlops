@@ -1,0 +1,41 @@
+-- Data quality expectations, checked by `snow dcm test` before any training and by Snowflake on the schedule below.
+-- To add a check: attach a system metric (SNOWFLAKE.CORE.NULL_COUNT, ROW_COUNT, DUPLICATE_COUNT, MIN, MAX, FRESHNESS,
+-- UNIQUE_COUNT, ...) or a DEFINE DATA METRIC FUNCTION of your own, name the expectation, state the condition on VALUE.
+-- Thresholds that differ per environment are manifest values, written as Jinja variables like the database name.
+
+-- The source the model reads: the previous month must be there, complete, clean and unique.
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.FRESHNESS
+  TO VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
+  ON (MONTH)
+  EXPECTATION PREVIOUS_MONTH_PRESENT (VALUE < {{ max_source_age_seconds }});
+
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.ROW_COUNT
+  TO VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
+  ON ()
+  EXPECTATION ENOUGH_HISTORY (VALUE >= {{ min_source_rows }});
+
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_COUNT
+  TO VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
+  ON (TONNES)
+  EXPECTATION NO_NULL_TONNES (VALUE = 0);
+
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.MIN
+  TO VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
+  ON (TONNES)
+  EXPECTATION NO_NEGATIVE_TONNES (VALUE >= 0);
+
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.DUPLICATE_COUNT
+  TO VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
+  ON (SITE_ID, MONTH)
+  EXPECTATION ONE_ROW_PER_SITE_MONTH (VALUE = 0);
+
+-- What the model wrote: every row has a forecast, and a version never writes a site month twice.
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.NULL_COUNT
+  TO TABLE {{ db }}.WORKSPACE.FORECAST_SITE_MONTH
+  ON (FORECAST_TONNES)
+  EXPECTATION NO_NULL_FORECAST (VALUE = 0);
+
+ATTACH DATA METRIC FUNCTION SNOWFLAKE.CORE.DUPLICATE_COUNT
+  TO TABLE {{ db }}.WORKSPACE.FORECAST_SITE_MONTH
+  ON (ROW_ID, MODEL_VERSION)
+  EXPECTATION ONE_ROW_PER_VERSION_SITE_MONTH (VALUE = 0);

@@ -24,7 +24,7 @@ Under that role the stage runs the same steps in every environment (B2): `snow d
 
 ![Quality gates](../img/quality-gates.png)
 
-Five checks stand between a change and the production default, and each one fails the stage it runs in. The pull request's `Validate` (lint, tests, DCM and feature store plans). The training gate, the held-out weighted error (`wape`, errors in tonnes over tonnes) under `gate_wape_max`, a loose ceiling that only refuses a broken model. The regression gate in every environment, the candidate's `wape` on the months with actuals against the current default version's, within `regression_tolerance`, the check that does the real work. The other metrics of the bake-off scorecard (bias, median and P90 error, RMSE, stockout and excess rates, the two naive baselines) are computed on the same rows and stored with the version; they inform and never block. The verify step, rows written, no null forecast, the version present. The approval on the prod environment. After them the version becomes the environment's default, and its monitor reports the error per month as the actuals refresh writes closed months onto its rows. The thresholds live in `dcm/assets/luckml/config/<env>.yml`.
+Six checks stand between a change and the production default, and each one fails the stage it runs in. The pull request's `Validate` (lint, tests, DCM and feature store plans). The data expectations after each deploy and before each monthly training (`quality.sql`, see the README). The training gate, the held-out weighted error (`wape`, errors in tonnes over tonnes) under `gate_wape_max`, a loose ceiling that only refuses a broken model. The regression gate in every environment, the candidate's `wape` on the months with actuals against the current default version's, within `regression_tolerance`, the check that does the real work. The other metrics of the bake-off scorecard (bias, median and P90 error, RMSE, stockout and excess rates, the two naive baselines) are computed on the same rows and stored with the version; they inform and never block. The verify step, rows written, no null forecast, the version present. The approval on the prod environment. After them the version becomes the environment's default, and its monitor reports the error per month as the actuals refresh writes closed months onto its rows. The thresholds live in `dcm/assets/luckml/config/<env>.yml`.
 
 ## C1 and C2, what moves between environments
 
@@ -36,8 +36,9 @@ Code moves, models do not. Test (C1) and prod (C2) receive the reviewed code bun
 
 1. `MONTHLY_START`, the root.
 2. `MONTHLY_FORECAST_DEFAULT`, after the root: the current default forecasts the months ahead, so the month always has a forecast.
-3. `MONTHLY_TRAIN`, after the root: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
-4. `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
+3. `MONTHLY_CHECK_DATA`, after the root: the data expectations of `quality.sql`, so a bad source month never trains a model.
+4. `MONTHLY_TRAIN`, after the check: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
+5. `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
 
 A failing task stops the tasks after it; the champion stays the default. The schedule assumes the previous month is complete in `<ENV>_DB.ODS.FCT_SITE_MONTH` by then; confirm the close date with the data team and move `cycle_schedule` if needed. The actuals refresh is idempotent, so a month that closes late is picked up by the next run. Task history is in Snowsight under Monitoring, Task History, and in `RUN_LOG`.
 

@@ -26,6 +26,16 @@ steps:
         snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber)"
   - template: snow-step.yml
     parameters:
+      displayName: Data expectations (${{ parameters.env }})
+      retry: 0
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        cd dcm
+        snow dcm test "${CONN[@]}" --target ${{ parameters.env }}
+  - template: snow-step.yml
+    parameters:
       displayName: Feature store plan and apply (${{ parameters.env }})
       serviceConnection: ${{ parameters.serviceConnection }}
       user: SVC_MLOPS_${{ upper(parameters.env) }}

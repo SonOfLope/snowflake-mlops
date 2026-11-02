@@ -1,5 +1,6 @@
 DEFINE VIEW {{ db }}.WORKSPACE.SRC_SITE_MONTH
   COMMENT = 'Monthly tonnes per site, the model input, read from the data platform.'
+  DATA_METRIC_SCHEDULE = '{{ dq_schedule }}'
   AS SELECT SITE_ID, MONTH, TONNES FROM {{ src_db }}.ODS.FCT_SITE_MONTH;
 
 DEFINE TABLE {{ db }}.WORKSPACE.FORECAST_SITE_MONTH (
@@ -15,7 +16,8 @@ DEFINE TABLE {{ db }}.WORKSPACE.FORECAST_SITE_MONTH (
   MODEL_VERSION VARCHAR,
   RUN_ID VARCHAR,
   RUN_AT TIMESTAMP_NTZ
-) COMMENT = 'Forecast rows per site and month, one set per model version; actuals filled as months close.';
+) COMMENT = 'Forecast rows per site and month, one set per model version; actuals filled as months close.'
+  DATA_METRIC_SCHEDULE = '{{ dq_schedule }}';
 
 DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG (
   RUN_ID VARCHAR,
