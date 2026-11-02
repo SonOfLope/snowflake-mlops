@@ -35,9 +35,9 @@ The same code trained on test data produced a challenger worse than test's defau
 
 Then run again: the pipeline from `main`, or the graph by executing its root task, `EXECUTE TASK <ENV>_ML_DB.WORKSPACE.MONTHLY_START`, as a role that owns it. Until the alert exists, nobody is told when a graph task fails; check Task History after the third of the month.
 
-## A drift chart moves
+## The monitor shows drift
 
-Drift is computed the day the forecast is written, so it is the first chart to move when a month looks unlike training. In order: the count charts (a site missing from the source moves every distance), the data expectations on `SRC_SITE_MONTH` for that month, then the same month a year earlier on the same chart, since tonnes are seasonal and a yearly movement is not drift. A departure that holds for two windows is a reason to train a challenger before the monthly cycle does, a run queued with `retrainProd` set; the regression gate decides whether it replaces the default.
+Each drift chart on a version's Monitoring tab has one point per 30-day window, the distance between that window's values and the version's training rows; drift is a point well above the ones before it. It is computed the day the forecast is written, so it is the first chart to react when a month looks unlike training. In order: the count charts (a site missing from the source moves every distance), the data expectations on `SRC_SITE_MONTH` for that month, then the same month a year earlier on the same chart, since tonnes are seasonal and a yearly movement is not drift. A departure that holds for two windows is a reason to train a challenger before the monthly cycle does, a run queued with `retrainProd` set; the regression gate decides whether it replaces the default.
 
 ## Roll the default back
 
