@@ -1,6 +1,6 @@
 # Objects
 
-What exists in each environment's ML database, who creates it, and what it holds. `<ENV>` is `DEV`, `TEST` or `PROD`. The database, its three schemas, the roles and the service users come from `LuckData-IaC-Snowflake-Horizon`; everything below is created by this repository's pipeline as `RBAC_ML_DEPLOYER_<ENV>`.
+What exists in each environment's ML database, who creates it, and what it holds. `<ENV>` is `DEV`, `TEST` or `PROD`. The database, its four schemas, the roles and the service users come from `LuckData-IaC-Snowflake-Horizon`; everything below is created by this repository's pipeline as `RBAC_ML_DEPLOYER_<ENV>`.
 
 ## WORKSPACE
 
@@ -8,22 +8,14 @@ What exists in each environment's ML database, who creates it, and what it holds
 |---|---|---|---|
 | `MLOPS` | DCM project | `snow dcm create` | the deployment history of everything DCM declares |
 | `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH`; carries the data expectations on the source |
-| `FORECAST_SITE_MONTH` | table | DCM, filled by the train job (held-out months) and the forecast job (months ahead) | one row per site, month and model version |
-| `BASELINE_SITE_MONTH` | table | DCM, filled by the train job | the rows each version was trained on, scored by it; its monitor's reference for drift |
-| `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
-| `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
-| `FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
-| `BASELINE_V<n>` | table | `sql/monitor.sql` in the bundle | a snapshot of the training rows of version `V<n>`, the baseline of its monitor; a monitor clones its baseline, so it is a table |
-| `MONTHLY_CYCLE` | task graph | DCM | the monthly cycle: `MONTHLY_START`, `MONTHLY_FORECAST_DEFAULT`, `MONTHLY_CHECK_DATA`, `MONTHLY_TRAIN`, `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`; started in prod only |
+| `RUN_LOG` | table | DCM, filled by the jobs | one row per job run of any model, `MODEL` names it; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
+| `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the job entry points and the config |
+| `FORECAST_SITE_MONTH`, `BASELINE_SITE_MONTH` | views | `scripts/move_tables.sql`, once | the old names of the two tables now in `SALES_FORECASTING`, read by the monitors of the versions promoted before the move; drop them with the last of those versions |
+| `FORECAST_V<n>`, `BASELINE_V<n>` | views | `sql/monitor.sql`, before the move | the per-version views of those same versions; the retire step drops them |
 | `JOB_RESULTS` | stage | DCM | the code bundle's result stage: one folder per job run, `LUCKML/<JOB>_<id>/`, holding the entry point's result (a few bytes); the jobs write their output to the tables, nothing reads this stage, purge it freely |
 | `IMAGES` | image repository | `LuckData-IaC-Snowflake-Horizon` | container images for a model served as a service; empty, the jobs run on Snowflake's ML runtime image |
 
 ```sql
-select SITE_ID, MONTH, FORECAST_TONNES, ACTUAL_TONNES, MODEL_VERSION
-from PROD_ML_DB.WORKSPACE.FORECAST_SITE_MONTH where MODEL_VERSION = 'V118' order by SITE_ID, MONTH limit 3;
--- 101 | 2026-07-01 | 25589.1 | 29699.7 | V118   held-out month, actual known
--- 101 | 2026-10-01 | 22537.9 |    null | V118   month ahead, actual written when the month closes
-
 select RUN_ID, STAGE, MODEL_VERSION, WAPE, METRICS:bias::float as BIAS, GATE_PASSED from PROD_ML_DB.WORKSPACE.RUN_LOG
 where STAGE = 'train' order by RUN_AT desc limit 1;
 ```
@@ -42,6 +34,26 @@ select SITE_ID, MONTH, TONNES, LAG_1, LAG_2, LAG_3, MONTH_NUM
 from PROD_ML_DB.FEATURES."SITE_MONTHLY_TONNES$1" order by SITE_ID, MONTH desc limit 1;
 ```
 
+## SALES_FORECASTING
+
+The family schema: what the sales forecasting models write. A second model of the family (a nowcast, for example) writes the same tables under its own `MODEL`.
+
+| Object | Kind | Created by | Holds |
+|---|---|---|---|
+| `SITE_MONTH_FORECAST` | table | DCM, filled by the train job (held-out months) and the forecast job (months ahead) | one row per site, month, model and version; actuals filled as months close |
+| `SITE_MONTH_BASELINE` | table | DCM, filled by the train job | the rows each version was trained on, scored by it; its monitor's reference for drift |
+| `SITE_TONNES_FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
+| `SITE_TONNES_FORECAST_V<n>_BASELINE` | table | `sql/monitor.sql` in the bundle | a snapshot of the training rows of version `V<n>`, the baseline of its monitor; a monitor clones its baseline, so it is a table |
+| `SITE_TONNES_MONTHLY` | task graph | DCM | the monthly cycle: `SITE_TONNES_MONTHLY_START`, `_FORECAST_DEFAULT`, `_CHECK_DATA`, `_TRAIN`, `_FORECAST_CHALLENGER`, `_GATE`, `_PROMOTE`; started in prod only |
+
+```sql
+select SITE_ID, MONTH, FORECAST_TONNES, ACTUAL_TONNES, MODEL_VERSION
+from PROD_ML_DB.SALES_FORECASTING.SITE_MONTH_FORECAST where MODEL = 'SITE_TONNES_FORECAST' and MODEL_VERSION = 'V118'
+order by SITE_ID, MONTH limit 3;
+-- 101 | 2026-07-01 | 25589.1 | 29699.7 | V118   held-out month, actual known
+-- 101 | 2026-10-01 | 22537.9 |    null | V118   month ahead, actual written when the month closes
+```
+
 ## MODELS
 
 | Object | Kind | Created by | Holds |
@@ -57,7 +69,7 @@ select * from table(MODEL_MONITOR_PERFORMANCE_METRIC(
 
 ## Growth and cleanup
 
-Each pipeline run adds, per environment, a model version, a `FORECAST_V<n>` view, a `BASELINE_V<n>` table, a monitor, one set of forecast rows and one set of baseline rows for that version.
+Each pipeline run adds, per environment, a model version, a `SITE_TONNES_FORECAST_V<n>` view, a `SITE_TONNES_FORECAST_V<n>_BASELINE` table, a monitor, one set of forecast rows and one set of baseline rows for that version.
 
 The promote job retires old versions after making a challenger the default, in the pipeline and in the monthly graph, as `SVC_MLOPS_<ENV>`, the owner of these objects. Two settings in `dcm/assets/luckml/config/<env>.yml` control it:
 

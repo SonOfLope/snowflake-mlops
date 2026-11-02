@@ -12,7 +12,7 @@ The monthly site tonnes forecast as code on Snowflake. A small Python package tr
 4. **Test.** The same steps on `TEST_ML_DB` with test data. Test proves the reviewed code trains, forecasts and passes the gates on a second dataset.
 5. **Prod.** After the approval on the `LuckData-Snowflake-MLOps-prod` environment, the same steps on `PROD_ML_DB` with production data. The default version in prod is what production code calls; it moves only when a challenger passes the regression gate there.
 A merge trains in dev and test every time, and in prod only when the run is queued with `retrainProd` set to true; by default prod receives the code, the objects and the feature views and keeps its model until the monthly cycle or a run someone asked for. Set the parameter when the merge changes the model or its features. Prod's first version comes from its first monthly cycle, or earlier from a run queued with the parameter; until then the graph's forecast of the default writes nothing and says so.
-6. **Every month, in prod.** The task graph `PROD_ML_DB.WORKSPACE.MONTHLY_CYCLE` forecasts the next months with the current default, then trains a challenger `M<yyyymmddhhmi>` on the latest data, forecasts, gates and promotes it with the same jobs. A challenger that loses leaves the champion in place. The graph is declared in every environment and started only in prod.
+6. **Every month, in prod.** The task graph `PROD_ML_DB.SALES_FORECASTING.SITE_TONNES_MONTHLY` forecasts the next months with the current default, then trains a challenger `M<yyyymmddhhmi>` on the latest data, forecasts, gates and promotes it with the same jobs. A challenger that loses leaves the champion in place. The graph is declared in every environment and started only in prod.
 
 `docs/architecture.md` walks the diagram journey by journey.
 
@@ -26,8 +26,8 @@ The source view and the forecast table carry data metric functions with expectat
 | `ENOUGH_HISTORY` | `SRC_SITE_MONTH` | at least `min_source_rows` rows |
 | `NO_NULL_TONNES`, `NO_NEGATIVE_TONNES` | `SRC_SITE_MONTH` | tonnes present and not negative |
 | `ONE_ROW_PER_SITE_MONTH` | `SRC_SITE_MONTH` | no duplicate site and month |
-| `NO_NULL_FORECAST` | `FORECAST_SITE_MONTH` | every row has a forecast |
-| `ONE_ROW_PER_VERSION_SITE_MONTH` | `FORECAST_SITE_MONTH` | a version never writes a site month twice |
+| `NO_NULL_FORECAST` | `SITE_MONTH_FORECAST` | every row has a forecast |
+| `ONE_ROW_PER_VERSION_SITE_MONTH` | `SITE_MONTH_FORECAST` | a version never writes a site month twice |
 
 To add a check, attach a system metric or your own `DEFINE DATA METRIC FUNCTION` to the column in `quality.sql`, name the expectation, and put any threshold that differs per environment in `dcm/manifest.yml`. The next deploy attaches it and the next test evaluates it.
 
@@ -49,14 +49,14 @@ A metric becomes blocking only when the business decides a release should stop o
 
 ## Monitoring
 
-Each promoted version has a model monitor in `MODELS`, on the model's Monitoring tab in Snowsight. It refreshes daily from the version's rows (`FORECAST_V<n>`) and shows, per 30-day window, the number of forecasts and of actuals, the accuracy metrics for the months with actuals, and drift, the distance between the window's inputs and predictions and the version's baseline, the rows it was trained on (`BASELINE_V<n>`). Drift is computed as soon as the forecast rows exist, the accuracy metrics once the actuals are loaded. Versions promoted before the baseline table existed have no baseline rows and no drift metrics.
+Each promoted version has a model monitor in `MODELS`, on the model's Monitoring tab in Snowsight. It refreshes daily from the version's rows (`SALES_FORECASTING.SITE_TONNES_FORECAST_V<n>`) and shows, per 30-day window, the number of forecasts and of actuals, the accuracy metrics for the months with actuals, and drift, the distance between the window's inputs and predictions and the version's baseline, the rows it was trained on (`SITE_TONNES_FORECAST_V<n>_BASELINE`). Drift is computed as soon as the forecast rows exist, the accuracy metrics once the actuals are loaded. Versions promoted before the baseline table existed have no baseline rows and no drift metrics.
 
 ## Layout
 
 ```
 azure-pipelines.yml            Validate, Dev, Test, Prod (approval)
 pipelines/templates/           tools.yml (Python environment), snow-step.yml (signed-in step), deploy-env.yml (the steps per environment)
-dcm/                           DCM project: WORKSPACE view, tables, stage, the LUCKML code bundle and the MONTHLY_CYCLE task graph
+dcm/                           DCM project: the WORKSPACE input view, run log, stage and LUCKML code bundle; the SALES_FORECASTING tables and SITE_TONNES_MONTHLY task graph
 dcm/assets/luckml/             the code bundle: code_bundle.yml, the luckml package, jobs/ (train, forecast, gate, promote), sql/, config/
 features/                      declarative feature store: SITE entity, SITE_MONTH_LAGS source, SITE_MONTHLY_TONNES view
 scripts/                       run_job.sql and job_output.sql, the pipeline's two SQL steps
@@ -110,7 +110,7 @@ Set on the pipeline definition, not in the YAML, so the file is the same everywh
 
 ## What the production model adds
 
-This repository carries the pattern on a deliberately small model. The production forecast brings its own feature views and training code into the same places (`features/`, `src/luckml/`, `jobs/`), a task graph in `WORKSPACE` so the forecast runs monthly without a pipeline run, the ODS view that reporting reads over `WORKSPACE.FORECAST_SITE_MONTH` (declared in `LuckData-Snowflake`), and a scheduled retrain that registers a candidate in test for a person to promote.
+This repository carries the pattern on a deliberately small model. The production forecast brings its own feature views and training code into the same places (`features/`, `src/luckml/`, `jobs/`), a task graph in `SALES_FORECASTING` so the forecast runs monthly without a pipeline run, the ODS view that reporting reads over `SALES_FORECASTING.SITE_MONTH_FORECAST` (declared in `LuckData-Snowflake`), and a scheduled retrain that registers a candidate in test for a person to promote.
 
 ## Versions
 

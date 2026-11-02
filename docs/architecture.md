@@ -6,7 +6,7 @@ Three repositories share the work. `LuckData-IaC-Snowflake-Horizon` declares the
 
 ## A0, experiments
 
-The AI engineer signs in to Snowsight as `FR_AI_ENGINEER`, which holds admin on `DEV_ML_DB.FEATURES`, `WORKSPACE` and `MODELS`, and works in a Workspace notebook or an IDE against the dev feature view. Versions logged this way live in `DEV_ML_DB.MODELS` beside the pipeline's and never leave dev. The same role has read only on test and prod.
+The AI engineer signs in to Snowsight as `FR_AI_ENGINEER`, which holds admin on `DEV_ML_DB.FEATURES`, `WORKSPACE`, `SALES_FORECASTING` and `MODELS`, and works in a Workspace notebook or an IDE against the dev feature view. Versions logged this way live in `DEV_ML_DB.MODELS` beside the pipeline's and never leave dev. The same role has read only on test and prod.
 
 ## A1 to A6, code to prod
 
@@ -18,7 +18,7 @@ A branch and a pull request (A1) run `Validate` through the branch policy on `ma
 
 Each stage is a deployment job on its own Azure DevOps environment and signs in through its own service connection. The connection's federated token (B1) is presented to Snowflake as `SVC_MLOPS_<ENV>`, a service user that holds `RBAC_ML_DEPLOYER_<ENV>` and nothing else. No key pair, no secret, nothing to rotate. The dev identity cannot read `TEST_ML_DB`; the boundary proof below shows the refusal.
 
-Under that role the stage runs the same steps in every environment (B2): `snow dcm deploy` for the `WORKSPACE` view, tables, stage, code bundle and task graph; `snow feature apply` for the feature view in `FEATURES`; then four jobs of the code bundle on `ML_CPU_POOL`. `train` logs a challenger trained on that environment's data; `forecast` writes its rows; `gate` writes the closed months' actuals onto every version's rows and refuses a challenger whose MAPE on those months is worse than the current default's beyond a tolerance; `promote` verifies the rows, creates the version's monitor, makes it the default, and retires old versions when enabled. The SQL these jobs run lives in the bundle's `sql/` folder.
+Under that role the stage runs the same steps in every environment (B2): `snow dcm deploy` for the `WORKSPACE` input view, run log, stage and code bundle and the `SALES_FORECASTING` tables and task graph; `snow feature apply` for the feature view in `FEATURES`; then four jobs of the code bundle on `ML_CPU_POOL`. `train` logs a challenger trained on that environment's data; `forecast` writes its rows; `gate` writes the closed months' actuals onto every version's rows and refuses a challenger whose weighted error on those months is worse than the current default's beyond a tolerance; `promote` verifies the rows, creates the version's monitor, makes it the default, and retires old versions when enabled. The SQL these jobs run lives in the bundle's `sql/` folder.
 
 ## Quality gates
 
@@ -32,13 +32,13 @@ Code moves, models do not. Test (C1) and prod (C2) receive the reviewed code bun
 
 ## M1, the monthly cycle
 
-`<ENV>_ML_DB.WORKSPACE.MONTHLY_CYCLE` is a task graph declared by DCM in every environment, started only in prod (`cycle_state` in `dcm/manifest.yml`), on `cycle_schedule`, the third of the month at 06:00 by default. One run:
+`<ENV>_ML_DB.SALES_FORECASTING.SITE_TONNES_MONTHLY` is a task graph declared by DCM in every environment, started only in prod (`cycle_state` in `dcm/manifest.yml`), on `cycle_schedule`, the third of the month at 06:00 by default. One run:
 
-1. `MONTHLY_START`, the root.
-2. `MONTHLY_FORECAST_DEFAULT`, after the root: the current default forecasts the months ahead, so the month always has a forecast.
-3. `MONTHLY_CHECK_DATA`, after the root: the data expectations of `quality.sql`, so a bad source month never trains a model.
-4. `MONTHLY_TRAIN`, after the check: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
-5. `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
+1. `SITE_TONNES_MONTHLY_START`, the root.
+2. `SITE_TONNES_MONTHLY_FORECAST_DEFAULT`, after the root: the current default forecasts the months ahead, so the month always has a forecast.
+3. `SITE_TONNES_MONTHLY_CHECK_DATA`, after the root: the data expectations of `quality.sql`, so a bad source month never trains a model.
+4. `SITE_TONNES_MONTHLY_TRAIN`, after the check: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
+5. `SITE_TONNES_MONTHLY_FORECAST_CHALLENGER`, `SITE_TONNES_MONTHLY_GATE`, `SITE_TONNES_MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
 
 A failing task stops the tasks after it; the champion stays the default. The schedule assumes the previous month is complete in `<ENV>_DB.ODS.FCT_SITE_MONTH` by then; confirm the close date with the data team and move `cycle_schedule` if needed. The actuals refresh is idempotent, so a month that closes late is picked up by the next run. Task history is in Snowsight under Monitoring, Task History, and in `RUN_LOG`.
 
@@ -48,17 +48,8 @@ Each `<ENV>_ML_DB.WORKSPACE.SRC_SITE_MONTH` view reads `<ENV>_DB.ODS.FCT_SITE_MO
 
 ## F1, consumption
 
-Reporting reads an ODS view in `PROD_DB` over `PROD_ML_DB.WORKSPACE.FORECAST_SITE_MONTH`, declared and deployed by `LuckData-Snowflake`, so a model change never reaches a report without passing the three environments.
+Reporting reads an ODS view in `PROD_DB` over `PROD_ML_DB.SALES_FORECASTING.SITE_MONTH_FORECAST`, declared and deployed by `LuckData-Snowflake`, so a model change never reaches a report without passing the three environments.
 
 ## Boundary proof
 
-The dev deployer role against the test database, as recorded on the first run:
-
-```
-select count(*) from TEST_ML_DB.WORKSPACE.FORECAST_SITE_MONTH
-select count(*) from TEST_ML_DB.WORKSPACE.FORECAST_SITE_MONTH
-002003 (02000): 01c7e095-0003-18b4-0003-b95e0020fb3e: SQL compilation error:
-Database 'TEST_ML_DB' does not exist or not authorized. Your primary role
-RBAC_ML_DEPLOYER_DEV must have USAGE or any other privilege granted on
-DATABASE TEST_ML_DB.
-```
+A query on `TEST_ML_DB` as `RBAC_ML_DEPLOYER_DEV` fails with `Database 'TEST_ML_DB' does not exist or not authorized`, recorded on the first run: each environment's identity reaches its own database only.

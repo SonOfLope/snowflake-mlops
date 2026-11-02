@@ -88,7 +88,7 @@ def test_train_writes_the_training_rows_scored_by_the_refit_as_the_versions_base
     real_fit = train.model.fit
     monkeypatch.setattr(train.model, "fit", lambda frame: fits.append(real_fit(frame)) or fits[-1])
     assert train.main(["--env", "dev", "--version", "VTEST", "--run-id", "t1"]) == 0
-    rows, version, _ = next(w for w in written if w[2].get("table") == "BASELINE_SITE_MONTH")
+    rows, version, _ = next(w for w in written if w[2].get("table") == "SITE_MONTH_BASELINE")
     assert version == "VTEST" and len(rows) == 24
     assert list(rows["FORECAST_TONNES"]) == list(fits[1].predict(rows[FEATURE_COLUMNS]))   # the refit, what the version will produce
     assert list(rows["ACTUAL_TONNES"]) == list(_good_frame()["TONNES"])

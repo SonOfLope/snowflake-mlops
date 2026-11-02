@@ -64,8 +64,10 @@ def test_write_is_idempotent(feature_frame):
     assert n1 == n2 == 3
     merges = [q for q in s.sqls if q.lstrip().upper().startswith("MERGE")]
     assert len(merges) == 2
-    assert "T.ROW_ID = S.ROW_ID AND T.MODEL_VERSION = S.MODEL_VERSION" in merges[0].upper()
+    assert "MERGE INTO DEV_ML_DB.SALES_FORECASTING.SITE_MONTH_FORECAST" in merges[0].upper()
+    assert "T.ROW_ID = S.ROW_ID AND T.MODEL = S.MODEL AND T.MODEL_VERSION = S.MODEL_VERSION" in merges[0].upper()
     staged = s.frames[0][1]
+    assert set(staged["MODEL"]) == {"SITE_TONNES_FORECAST"}
     assert staged.loc[staged["MONTH"] == "2026-09-01", "ROW_ID"].iloc[0] == "101-2026-09"
     assert set(staged["MODEL_VERSION"]) == {"V9"}
 
@@ -74,6 +76,6 @@ def test_write_targets_the_given_table(feature_frame):
     cfg = config.load("dev")
     rows = forecast.predict_horizon(FakeVersion(), feature_frame, 3)
     s = FakeSession()
-    forecast.write(s, cfg, rows, "V9", "run9", table="BASELINE_SITE_MONTH")
+    forecast.write(s, cfg, rows, "V9", "run9", table="SITE_MONTH_BASELINE")
     merge = next(q for q in s.sqls if q.lstrip().upper().startswith("MERGE"))
-    assert "MERGE INTO DEV_ML_DB.WORKSPACE.BASELINE_SITE_MONTH" in merge.upper()
+    assert "MERGE INTO DEV_ML_DB.SALES_FORECASTING.SITE_MONTH_BASELINE" in merge.upper()

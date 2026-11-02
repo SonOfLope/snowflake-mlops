@@ -1,5 +1,6 @@
 env: test
 database: TEST_ML_DB
+schema: SALES_FORECASTING
 source_database: TEST_DB
 warehouse: ML_WH
 compute_pool: ML_CPU_POOL

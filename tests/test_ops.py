@@ -33,7 +33,7 @@ def test_statements_keep_scripting_blocks_whole_and_fill_variables():
 
 
 def test_every_bundle_script_renders_without_leftover_variables():
-    values = {"db": "DEV_ML_DB", "version": "V1", "tolerance": "0.1", "keep": "50", "wh": "ML_WH"}
+    values = {"db": "DEV_ML_DB", "schema": "SALES_FORECASTING", "model": "SITE_TONNES_FORECAST", "version": "V1", "tolerance": "0.1", "keep": "50", "wh": "ML_WH"}
     for path in SQL.glob("*.sql"):
         for stmt in ops.statements(path.read_text(), **values):
             assert "<%" not in stmt, path.name
@@ -42,7 +42,7 @@ def test_every_bundle_script_renders_without_leftover_variables():
 def test_gate_refreshes_actuals_then_compares_with_the_configured_tolerance():
     s = FakeSession()
     ops.gate(s, config.load("dev"), "V9", "run9")
-    assert "UPDATE DEV_ML_DB.WORKSPACE.FORECAST_SITE_MONTH" in s.statements[0]
+    assert "UPDATE DEV_ML_DB.SALES_FORECASTING.SITE_MONTH_FORECAST" in s.statements[0]
     assert any("1 + 0.1" in t for t in s.statements)
 
 
@@ -72,6 +72,9 @@ def test_promote_monitors_then_sets_the_default_and_skips_retire_when_disabled()
     monitor = next(i for i, t in enumerate(s.statements) if "CREATE MODEL MONITOR" in t)
     default = next(i for i, t in enumerate(s.statements) if "SET DEFAULT_VERSION = V9" in t)
     assert monitor < default
+    assert "DEV_ML_DB.MODELS.SITE_TONNES_FORECAST_V9_MON" in s.statements[monitor]
+    assert "SOURCE = DEV_ML_DB.SALES_FORECASTING.SITE_TONNES_FORECAST_V9\n" in s.statements[monitor]
+    assert "ALTER MODEL DEV_ML_DB.MODELS.SITE_TONNES_FORECAST SET DEFAULT_VERSION = V9" in s.statements[default]
     assert not any("DROP VERSION" in t for t in s.statements)
 
 
@@ -130,7 +133,7 @@ def test_gate_writes_its_run_log_row_even_when_it_fails():
     with pytest.raises(RuntimeError):
         ops.gate(s, config.load("dev"), "V9", "run9")
     logged = [p for t, p in zip(s.statements, s.params) if "insert into DEV_ML_DB.WORKSPACE.RUN_LOG" in t]
-    assert len(logged) == 1 and logged[0][:4] == ["run9", "gate", "V9", False]
+    assert len(logged) == 1 and logged[0][:4] == ["run9", "gate", "V9", False] and logged[0][-1] == "SITE_TONNES_FORECAST"
 
 
 def test_promote_writes_its_run_log_row():
