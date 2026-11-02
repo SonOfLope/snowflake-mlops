@@ -1,5 +1,6 @@
 env: prod
 database: PROD_ML_DB
+schema: SALES_FORECASTING
 source_database: PROD_DB
 warehouse: ML_WH
 compute_pool: ML_CPU_POOL

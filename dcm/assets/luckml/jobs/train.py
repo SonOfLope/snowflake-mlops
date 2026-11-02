@@ -19,9 +19,9 @@ from luckml import config, data, features, forecast, model, registry, session
 
 def write_run_log(s, cfg, run_id, stage, version, metrics, gate_passed):
     s.sql(
-        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, WAPE, METRICS, GATE_PASSED, RUN_AT) "
-        "select ?, ?, ?, ?, ?, parse_json(?), ?, current_timestamp()",
-        params=[run_id, stage, version, metrics.get("mape"), metrics.get("wape"), json.dumps(metrics), gate_passed],
+        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, WAPE, METRICS, GATE_PASSED, RUN_AT, MODEL) "
+        "select ?, ?, ?, ?, ?, parse_json(?), ?, current_timestamp(), ?",
+        params=[run_id, stage, version, metrics.get("mape"), metrics.get("wape"), json.dumps(metrics), gate_passed, cfg.model_name],
     ).collect()
 
 
@@ -46,7 +46,7 @@ def main(argv=None) -> int:
         refit = model.fit(frame)
         registry.log(s, cfg, refit, a.version, metrics, frame)
         forecast.write(s, cfg, forecast.scored_frame(m, holdout), a.version, a.run_id)
-        forecast.write(s, cfg, forecast.scored_frame(refit, frame), a.version, a.run_id, table="BASELINE_SITE_MONTH")
+        forecast.write(s, cfg, forecast.scored_frame(refit, frame), a.version, a.run_id, table="SITE_MONTH_BASELINE")
     print(json.dumps({"version": a.version, "gate": passed, **metrics}))
     return 0 if passed else 1
 

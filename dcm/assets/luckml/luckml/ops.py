@@ -36,15 +36,16 @@ def run(session, name: str, **values) -> list:
 
 def log_run(session, cfg: Config, run_id: str, stage: str, version: str, passed: bool, detail: dict) -> None:
     session.sql(
-        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, GATE_PASSED, METRICS, RUN_AT) "
-        "select ?, ?, ?, ?, parse_json(?), current_timestamp()",
-        params=[run_id, stage, version, passed, json.dumps(detail)],
+        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, GATE_PASSED, METRICS, RUN_AT, MODEL) "
+        "select ?, ?, ?, ?, parse_json(?), current_timestamp(), ?",
+        params=[run_id, stage, version, passed, json.dumps(detail), cfg.model_name],
     ).collect()
 
 
 def gate(session, cfg: Config, version: str, run_id: str) -> None:
-    run(session, "actuals", db=cfg.database)
-    rows = run(session, "regression", db=cfg.database, version=version, tolerance=cfg.regression_tolerance)
+    run(session, "actuals", db=cfg.database, schema=cfg.schema)
+    rows = run(session, "regression", db=cfg.database, schema=cfg.schema, model=cfg.model_name, version=version,
+               tolerance=cfg.regression_tolerance)
     verdict = str(rows[0][0]) if rows else ""
     print(verdict)
     passed = not verdict.startswith("FAIL")
@@ -54,15 +55,16 @@ def gate(session, cfg: Config, version: str, run_id: str) -> None:
 
 
 def promote(session, cfg: Config, version: str, run_id: str) -> None:
-    row = run(session, "verify", db=cfg.database, version=version)[0]
+    row = run(session, "verify", db=cfg.database, schema=cfg.schema, model=cfg.model_name, version=version)[0]
     checks = {k: row[k] for k in ("FORECAST_ROWS", "NULL_FORECASTS", "VERSION_PRESENT", "BASELINE_ROWS")}
     print(checks)
     if row["FORECAST_ROWS"] == 0 or row["NULL_FORECASTS"] > 0 or row["VERSION_PRESENT"] == 0 or row["BASELINE_ROWS"] == 0:
         log_run(session, cfg, run_id, "promote", version, False, checks)
         raise RuntimeError(f"{version} failed verification")
-    run(session, "monitor", db=cfg.database, version=version, wh=cfg.warehouse)
-    run(session, "set_default", db=cfg.database, version=version)
-    retired = run(session, "retire", db=cfg.database, keep=cfg.retain_versions) if cfg.retire_enabled else []
+    run(session, "monitor", db=cfg.database, schema=cfg.schema, model=cfg.model_name, version=version, wh=cfg.warehouse)
+    run(session, "set_default", db=cfg.database, model=cfg.model_name, version=version)
+    retired = (run(session, "retire", db=cfg.database, schema=cfg.schema, model=cfg.model_name, keep=cfg.retain_versions)
+               if cfg.retire_enabled else [])
     if retired:
         print(retired)
     log_run(session, cfg, run_id, "promote", version, True, {**checks, "retired": str(retired[0][0]) if retired else "disabled"})

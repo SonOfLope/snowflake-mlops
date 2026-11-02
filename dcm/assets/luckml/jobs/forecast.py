@@ -29,9 +29,9 @@ def main(argv=None) -> int:
     rows = forecast.predict_horizon(mv, data.load_feature_frame(s, cfg), cfg.horizon_months)
     n = forecast.write(s, cfg, rows, version, a.run_id)
     s.sql(
-        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, GATE_PASSED, RUN_AT) "
-        "select ?, 'forecast', ?, null, true, current_timestamp()",
-        params=[a.run_id, version],
+        f"insert into {cfg.database}.WORKSPACE.RUN_LOG (RUN_ID, STAGE, MODEL_VERSION, MAPE, GATE_PASSED, RUN_AT, MODEL) "
+        "select ?, 'forecast', ?, null, true, current_timestamp(), ?",
+        params=[a.run_id, version, cfg.model_name],
     ).collect()
     print(json.dumps({"version": version, "rows": n}))
     return 0

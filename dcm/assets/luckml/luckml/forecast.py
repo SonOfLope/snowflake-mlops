@@ -49,10 +49,11 @@ def scored_frame(m, rows: pd.DataFrame) -> pd.DataFrame:
     return out[OUTPUT_COLUMNS].reset_index(drop=True)
 
 
-def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str, table: str = "FORECAST_SITE_MONTH") -> int:
-    """Merges rows into WORKSPACE.<table> on (ROW_ID, MODEL_VERSION); a rerun rewrites, never duplicates."""
+def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str, table: str = "SITE_MONTH_FORECAST") -> int:
+    """Merges rows into <schema>.<table> on (ROW_ID, MODEL, MODEL_VERSION); a rerun rewrites, never duplicates."""
     staged = rows.copy()
     staged["ROW_ID"] = staged["SITE_ID"].astype(int).astype(str) + "-" + pd.to_datetime(staged["MONTH"]).dt.strftime("%Y-%m")
+    staged["MODEL"] = cfg.model_name
     staged["MODEL_VERSION"] = version
     staged["RUN_ID"] = run_id
     staged["RUN_AT"] = pd.Timestamp.utcnow().tz_localize(None).strftime("%Y-%m-%d %H:%M:%S")
@@ -61,15 +62,15 @@ def write(session, cfg: Config, rows: pd.DataFrame, version: str, run_id: str, t
     session.write_pandas(staged, temp, database=cfg.database, schema="WORKSPACE", auto_create_table=True,
                          table_type="temporary", overwrite=True, quote_identifiers=False)
     cols = ["ROW_ID", "SITE_ID", "MONTH", "MONTH_NUM", "LAG_1", "LAG_2", "LAG_3", "FORECAST_TONNES",
-            "ACTUAL_TONNES", "MODEL_VERSION", "RUN_ID", "RUN_AT"]
+            "ACTUAL_TONNES", "MODEL", "MODEL_VERSION", "RUN_ID", "RUN_AT"]
     source = (
         "select ROW_ID, SITE_ID, to_timestamp_ntz(MONTH) as MONTH, MONTH_NUM, LAG_1, LAG_2, LAG_3, FORECAST_TONNES, "
-        f"ACTUAL_TONNES, MODEL_VERSION, RUN_ID, to_timestamp_ntz(RUN_AT) as RUN_AT from {cfg.database}.WORKSPACE.{temp}"
+        f"ACTUAL_TONNES, MODEL, MODEL_VERSION, RUN_ID, to_timestamp_ntz(RUN_AT) as RUN_AT from {cfg.database}.WORKSPACE.{temp}"
     )
     updates = ", ".join(f"t.{c} = s.{c}" for c in ("FORECAST_TONNES", "ACTUAL_TONNES", "LAG_1", "LAG_2", "LAG_3", "RUN_ID", "RUN_AT"))
     session.sql(
-        f"merge into {cfg.database}.WORKSPACE.{table} t using ({source}) s "
-        "on t.ROW_ID = s.ROW_ID and t.MODEL_VERSION = s.MODEL_VERSION "
+        f"merge into {cfg.database}.{cfg.schema}.{table} t using ({source}) s "
+        "on t.ROW_ID = s.ROW_ID and t.MODEL = s.MODEL and t.MODEL_VERSION = s.MODEL_VERSION "
         f"when matched then update set {updates} "
         f"when not matched then insert ({', '.join(cols)}) values ({', '.join('s.' + c for c in cols)})"
     ).collect()

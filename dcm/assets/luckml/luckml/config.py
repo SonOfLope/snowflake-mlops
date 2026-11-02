@@ -11,6 +11,7 @@ import yaml
 class Config:
     env: str
     database: str
+    schema: str
     source_database: str
     warehouse: str
     compute_pool: str

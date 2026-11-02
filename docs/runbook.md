@@ -24,7 +24,7 @@ The same code trained on test data produced a challenger worse than test's defau
 
 ## A data expectation fails
 
-`snow dcm test` after a deploy, or `MONTHLY_CHECK_DATA` in the graph, named an expectation. Nothing trained.
+`snow dcm test` after a deploy, or `SITE_TONNES_MONTHLY_CHECK_DATA` in the graph, named an expectation. Nothing trained.
 
 | Expectation | Likely cause | Fix |
 |---|---|---|
@@ -33,7 +33,7 @@ The same code trained on test data produced a challenger worse than test's defau
 | `NO_NULL_TONNES`, `NO_NEGATIVE_TONNES`, `ONE_ROW_PER_SITE_MONTH` | a defect in the fact table | fix it where the fact is built, in `LuckData-Snowflake`; never patch it in the ML database |
 | `NO_NULL_FORECAST`, `ONE_ROW_PER_VERSION_SITE_MONTH` | a bug in the forecast job, or rows of an old version | fix the job through a pull request; delete the offending version's rows |
 
-Then run again: the pipeline from `main`, or the graph by executing its root task, `EXECUTE TASK <ENV>_ML_DB.WORKSPACE.MONTHLY_START`, as a role that owns it. Until the alert exists, nobody is told when a graph task fails; check Task History after the third of the month.
+Then run again: the pipeline from `main`, or the graph by executing its root task, `EXECUTE TASK <ENV>_ML_DB.SALES_FORECASTING.SITE_TONNES_MONTHLY_START`, as a role that owns it. Until the alert exists, nobody is told when a graph task fails; check Task History after the third of the month.
 
 ## Roll the default back
 

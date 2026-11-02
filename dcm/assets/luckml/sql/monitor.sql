@@ -1,18 +1,18 @@
 -- One monitor per promoted version, over a view of that version's rows, with a snapshot of the version's training rows as
--- the baseline for drift (a monitor clones its baseline, so it is a table). Variables: db, version, wh.
-CREATE OR REPLACE VIEW <% db %>.WORKSPACE.FORECAST_<% version %> AS
-  SELECT * FROM <% db %>.WORKSPACE.FORECAST_SITE_MONTH WHERE MODEL_VERSION = '<% version %>';
+-- the baseline for drift (a monitor clones its baseline, so it is a table). Variables: db, schema, model, version, wh.
+CREATE OR REPLACE VIEW <% db %>.<% schema %>.<% model %>_<% version %> AS
+  SELECT * FROM <% db %>.<% schema %>.SITE_MONTH_FORECAST WHERE MODEL = '<% model %>' AND MODEL_VERSION = '<% version %>';
 
-CREATE OR REPLACE TABLE <% db %>.WORKSPACE.BASELINE_<% version %> AS
-  SELECT * FROM <% db %>.WORKSPACE.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>';
+CREATE OR REPLACE TABLE <% db %>.<% schema %>.<% model %>_<% version %>_BASELINE AS
+  SELECT * FROM <% db %>.<% schema %>.SITE_MONTH_BASELINE WHERE MODEL = '<% model %>' AND MODEL_VERSION = '<% version %>';
 
-CREATE MODEL MONITOR IF NOT EXISTS <% db %>.MODELS.SITE_TONNES_FORECAST_<% version %>_MON
+CREATE MODEL MONITOR IF NOT EXISTS <% db %>.MODELS.<% model %>_<% version %>_MON
 WITH
-  MODEL = <% db %>.MODELS.SITE_TONNES_FORECAST
+  MODEL = <% db %>.MODELS.<% model %>
   VERSION = <% version %>
   FUNCTION = predict
-  SOURCE = <% db %>.WORKSPACE.FORECAST_<% version %>
-  BASELINE = <% db %>.WORKSPACE.BASELINE_<% version %>
+  SOURCE = <% db %>.<% schema %>.<% model %>_<% version %>
+  BASELINE = <% db %>.<% schema %>.<% model %>_<% version %>_BASELINE
   WAREHOUSE = <% wh %>
   REFRESH_INTERVAL = '1 day'
   AGGREGATION_WINDOW = '30 days'

@@ -1,5 +1,6 @@
 env: dev
 database: DEV_ML_DB
+schema: SALES_FORECASTING
 source_database: DEV_DB
 warehouse: ML_WH
 compute_pool: ML_CPU_POOL
