@@ -6,6 +6,11 @@ class FakeVersion:
         return frame.assign(output_feature_0=frame["LAG_1"] * 1.0)
 
 
+class FakeModel:
+    def predict(self, frame):
+        return frame["LAG_1"].to_numpy() * 2.0
+
+
 class FakeSession:
     def __init__(self):
         self.frames = []
@@ -41,6 +46,13 @@ def test_backfill_frame_scores_holdout(feature_frame):
     out = forecast.backfill_frame(FakeVersion(), holdout)
     assert list(out["ACTUAL_TONNES"]) == [150.0, 160.0, 170.0]
     assert list(out["FORECAST_TONNES"]) == list(holdout["LAG_1"])
+
+
+def test_backfill_frame_scores_holdout_with_a_fitted_model(feature_frame):
+    holdout = feature_frame[(feature_frame["SITE_ID"] == 101)].tail(3)
+    out = forecast.backfill_frame(FakeModel(), holdout)
+    assert list(out["FORECAST_TONNES"]) == [2 * v for v in holdout["LAG_1"]]
+    assert list(out["ACTUAL_TONNES"]) == [150.0, 160.0, 170.0]
 
 
 def test_write_is_idempotent(feature_frame):

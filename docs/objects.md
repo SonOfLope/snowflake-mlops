@@ -8,7 +8,7 @@ What exists in each environment's ML database, who creates it, and what it holds
 |---|---|---|---|
 | `MLOPS` | DCM project | `snow dcm create` | the deployment history of everything DCM declares |
 | `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH`; carries the data expectations on the source |
-| `FORECAST_SITE_MONTH` | table | DCM, filled by the forecast job | one row per site, month and model version |
+| `FORECAST_SITE_MONTH` | table | DCM, filled by the train job (held-out months) and the forecast job (months ahead) | one row per site, month and model version |
 | `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
 | `FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
