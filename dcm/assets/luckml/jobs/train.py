@@ -35,7 +35,7 @@ def main(argv=None) -> int:
     frame = features.training_frame(data.load_feature_frame(s, cfg))
     train, holdout = features.split_last_months(frame, cfg.eval_months)
     m = model.fit(train)
-    metrics = model.evaluate(m, holdout, train)
+    metrics = model.evaluate(m, holdout, train, cfg.risk_threshold)
     passed = model.gate(metrics, cfg)
     write_run_log(s, cfg, a.run_id, "train", a.version, metrics, passed)
     if passed:

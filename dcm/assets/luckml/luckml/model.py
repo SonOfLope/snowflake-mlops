@@ -15,9 +15,6 @@ PARAMS = {
     "random_state": 7,
     "verbose": -1,
 }
-RISK = 0.20
-
-
 def fit(train: pd.DataFrame) -> LGBMRegressor:
     m = LGBMRegressor(**PARAMS)
     m.fit(train[FEATURE_COLUMNS], train[TARGET])
@@ -28,8 +25,10 @@ def wape(pred: np.ndarray, actual: np.ndarray) -> float:
     return float(np.abs(pred - actual).sum() / actual.sum())
 
 
-def evaluate(m, holdout: pd.DataFrame, history: pd.DataFrame) -> dict:
-    """Metrics on the held-out rows with a positive actual, as fractions. The gate reads wape; the rest is reported."""
+def evaluate(m, holdout: pd.DataFrame, history: pd.DataFrame, risk: float = 0.20) -> dict:
+    """Metrics on the held-out rows with a positive actual, as fractions. The gate reads wape; the rest is reported.
+
+    risk: a miss beyond this share of the actual, either way, counts as a stockout or an excess."""
     scored = holdout[holdout[TARGET] > 0].reset_index(drop=True)
     actual = scored[TARGET].to_numpy(dtype=float)
     pred = np.asarray(m.predict(scored[FEATURE_COLUMNS]), dtype=float)
@@ -48,8 +47,8 @@ def evaluate(m, holdout: pd.DataFrame, history: pd.DataFrame) -> dict:
         "p90_ape": float(np.quantile(ape, 0.9)),
         "bias": float(signed.sum() / actual.sum()),
         "rmse": float(np.sqrt(np.mean(signed**2))),
-        "stockout_rate": float(np.mean(signed < -RISK * actual)),
-        "excess_rate": float(np.mean(signed > RISK * actual)),
+        "stockout_rate": float(np.mean(signed < -risk * actual)),
+        "excess_rate": float(np.mean(signed > risk * actual)),
         "persistence_wape": wape(persistence, actual),
         "seasonal_naive_wape": wape(seasonal.to_numpy(dtype=float), actual) if seasonal.notna().all() else None,
     }

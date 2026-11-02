@@ -26,7 +26,7 @@ Every training run scores the challenger on the held-out months, on rows with a 
 | `bias` | sum of signed errors over sum of actuals; positive means over-forecast | reported |
 | `median_ape`, `p90_ape` | the middle and the worst tenth of the per-row errors | reported |
 | `rmse` | root mean squared error, in tonnes | reported |
-| `stockout_rate`, `excess_rate` | share of rows under-forecast, or over-forecast, by more than 20 percent | reported |
+| `stockout_rate`, `excess_rate` | share of rows under-forecast, or over-forecast, by more than `risk_threshold` (20 percent) | reported |
 | `persistence_wape`, `seasonal_naive_wape` | the error of the trailing three-month average and of the same month last year, on the same rows | reported; a model that does not beat them is not earning its keep |
 
 A metric becomes blocking only when the business decides a release should stop on it; until then it is a number people read, and an alert can watch.

@@ -20,6 +20,7 @@ class Config:
     feature_view_version: str
     gate_wape_max: float
     regression_tolerance: float
+    risk_threshold: float
     retire_enabled: bool
     retain_versions: int
     horizon_months: int
