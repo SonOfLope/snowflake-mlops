@@ -36,3 +36,7 @@ def version_exists(session, cfg: Config, version: str) -> bool:
 
 def get_version(session, cfg: Config, version: str):
     return open(session, cfg).get_model(cfg.model_name).version(version)
+
+
+def default_version(session, cfg: Config) -> str:
+    return open(session, cfg).get_model(cfg.model_name).default.version_name

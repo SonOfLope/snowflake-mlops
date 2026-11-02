@@ -2,7 +2,7 @@
 
 ![Lifecycle](../img/mlops-sdlc.png)
 
-Three repositories share the work. `LuckData-IaC-Snowflake-Horizon` declares the identities, databases, roles, pool and warehouse. `LuckData-Snowflake` deploys the source views the model reads and the ODS view reporting consumes. This repository deploys the model's own objects and moves one version from dev to prod. The journeys below are the numbered arrows on the diagram.
+Three repositories share the work. `LuckData-IaC-Snowflake-Horizon` declares the identities, databases, roles, pool and warehouse. `LuckData-Snowflake` deploys the source views the model reads and the ODS view reporting consumes. This repository deploys the model's own objects and its code; each environment trains its own model from that code. The journeys below are the numbered arrows on the diagram.
 
 ## A0, experiments
 
@@ -18,7 +18,7 @@ A branch and a pull request (A1) run `Validate` through the branch policy on `ma
 
 Each stage is a deployment job on its own Azure DevOps environment and signs in through its own service connection. The connection's federated token (B1) is presented to Snowflake as `SVC_MLOPS_<ENV>`, a service user that holds `RBAC_ML_DEPLOYER_<ENV>` and nothing else. No key pair, no secret, nothing to rotate. The dev identity cannot read `TEST_ML_DB`; the boundary proof below shows the refusal.
 
-Under that role the stage runs the same steps (B2): `snow dcm deploy` for the `WORKSPACE` view, tables and stage; `snow feature apply` for the feature view in `FEATURES`; the version (trained in dev as an ML Job on `ML_CPU_POOL`, copied elsewhere); the batch forecast as a second ML Job; `actuals.sql`, which writes the closed months' actuals onto every version's rows, and `regression.sql`, which refuses a candidate whose MAPE on those months is worse than the current default's beyond a tolerance; `verify.sql` and the monitor; `set_default.sql`, so each environment's default is its last version that passed.
+Under that role the stage runs the same steps in every environment (B2): `snow dcm deploy` for the `WORKSPACE` view, tables, stage, code bundle and task graph; `snow feature apply` for the feature view in `FEATURES`; then four jobs of the code bundle on `ML_CPU_POOL`. `train` logs a challenger trained on that environment's data; `forecast` writes its rows; `gate` writes the closed months' actuals onto every version's rows and refuses a challenger whose MAPE on those months is worse than the current default's beyond a tolerance; `promote` verifies the rows, creates the version's monitor, makes it the default, and retires old versions when enabled. The SQL these jobs run lives in the bundle's `sql/` folder.
 
 ## Quality gates
 
@@ -26,9 +26,20 @@ Under that role the stage runs the same steps (B2): `snow dcm deploy` for the `W
 
 Five checks stand between a change and the production default, and each one fails the stage it runs in. The pull request's `Validate` (lint, tests, DCM and feature store plans). The training gate in dev, the held-out MAPE under `gate_mape_max`, else no version is logged. The regression gate in every environment, the candidate's MAPE on the months with actuals against the current default version's, within `regression_tolerance`. The verify step, rows written, no null forecast, the version present. The approval on the prod environment. After them the version becomes the environment's default, and its monitor reports MAPE per month as the actuals refresh writes closed months onto its rows. The thresholds live in `dcm/assets/luckml/config/<env>.yml`.
 
-## C1 and C2, promotion
+## C1 and C2, what moves between environments
 
-Test receives the exact version dev logged, by `CREATE MODEL ... FROM MODEL` across databases (C1), through the `USAGE` and `READ` its deployer holds on dev's models (`MODELS_R` of the previous environment; the copy reads the model's artifacts, which `USAGE` alone does not allow). Prod does the same from test (C2). The default version in prod is what production code calls, and it moves only after the regression gate in prod passed. A rerun with a version already present is a no-op, and the copy carries the version's comment.
+Code moves, models do not. Test (C1) and prod (C2) receive the reviewed code bundle and train their own challenger from it; no environment reads another's models. This is the deploy-code pattern: the code is what is reviewed and tested, and every production model is trained on production data by that code. The default version in prod is what production code calls, and it moves only when a challenger passed the regression gate in prod.
+
+## M1, the monthly cycle
+
+`<ENV>_ML_DB.WORKSPACE.MONTHLY_CYCLE` is a task graph declared by DCM in every environment, started only in prod (`cycle_state` in `dcm/manifest.yml`), on `cycle_schedule`, the third of the month at 06:00 by default. One run:
+
+1. `MONTHLY_START`, the root.
+2. `MONTHLY_FORECAST_DEFAULT`, after the root: the current default forecasts the months ahead, so the month always has a forecast.
+3. `MONTHLY_TRAIN`, after the root: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
+4. `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
+
+A failing task stops the tasks after it; the champion stays the default. Task history is in Snowsight under Monitoring, Task History, and in `RUN_LOG`.
 
 ## D1, the data
 

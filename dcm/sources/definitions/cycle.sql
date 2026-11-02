@@ -1,0 +1,76 @@
+-- The monthly cycle in each environment, one graph run per month after close. The version trained in a run is
+-- M<yyyymmddhhmi> of the run's scheduled time, the same in every task of that run.
+-- The champion forecasts first; the challenger is trained, forecast, gated against the champion and promoted if it passes.
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_START
+AS
+SELECT 1;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_FORECAST_DEFAULT
+  AFTER {{ db }}.WORKSPACE.MONTHLY_START
+AS
+EXECUTE IMMEDIATE $$
+BEGIN
+  LET v STRING := 'M' || TO_CHAR(SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP')::TIMESTAMP_LTZ, 'YYYYMMDDHH24MI');
+  EXECUTE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+    ENTRYPOINT = 'jobs/forecast.py'
+    ARGUMENTS = ('--env', '{{ env }}', '--run-id', :v);
+END;
+$$;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_TRAIN
+  AFTER {{ db }}.WORKSPACE.MONTHLY_START
+AS
+EXECUTE IMMEDIATE $$
+BEGIN
+  LET v STRING := 'M' || TO_CHAR(SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP')::TIMESTAMP_LTZ, 'YYYYMMDDHH24MI');
+  EXECUTE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+    ENTRYPOINT = 'jobs/train.py'
+    ARGUMENTS = ('--env', '{{ env }}', '--version', :v, '--run-id', :v);
+END;
+$$;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_FORECAST_CHALLENGER
+  AFTER {{ db }}.WORKSPACE.MONTHLY_TRAIN
+AS
+EXECUTE IMMEDIATE $$
+BEGIN
+  LET v STRING := 'M' || TO_CHAR(SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP')::TIMESTAMP_LTZ, 'YYYYMMDDHH24MI');
+  EXECUTE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+    ENTRYPOINT = 'jobs/forecast.py'
+    ARGUMENTS = ('--env', '{{ env }}', '--version', :v, '--run-id', :v);
+END;
+$$;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_GATE
+  AFTER {{ db }}.WORKSPACE.MONTHLY_FORECAST_CHALLENGER
+AS
+EXECUTE IMMEDIATE $$
+BEGIN
+  LET v STRING := 'M' || TO_CHAR(SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP')::TIMESTAMP_LTZ, 'YYYYMMDDHH24MI');
+  EXECUTE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+    ENTRYPOINT = 'jobs/gate.py'
+    ARGUMENTS = ('--env', '{{ env }}', '--version', :v, '--run-id', :v);
+END;
+$$;
+
+DEFINE TASK {{ db }}.WORKSPACE.MONTHLY_PROMOTE
+  AFTER {{ db }}.WORKSPACE.MONTHLY_GATE
+AS
+EXECUTE IMMEDIATE $$
+BEGIN
+  LET v STRING := 'M' || TO_CHAR(SYSTEM$TASK_RUNTIME_INFO('CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP')::TIMESTAMP_LTZ, 'YYYYMMDDHH24MI');
+  EXECUTE CODE BUNDLE {{ db }}.WORKSPACE.LUCKML
+    ENTRYPOINT = 'jobs/promote.py'
+    ARGUMENTS = ('--env', '{{ env }}', '--version', :v, '--run-id', :v);
+END;
+$$;
+
+DEFINE TASK GRAPH {{ db }}.WORKSPACE.MONTHLY_CYCLE
+  SCHEDULE = '{{ cycle_schedule }}'
+  ROOTS = ({{ db }}.WORKSPACE.MONTHLY_START)
+  TASK_DEFAULTS (
+    WAREHOUSE = '{{ wh }}'
+  )
+  {{ cycle_state }}
+;

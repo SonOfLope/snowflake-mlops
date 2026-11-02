@@ -50,8 +50,6 @@ stages:
                     env: dev
                     db: DEV_ML_DB
                     serviceConnection: $(serviceConnectionDev)
-                    modelVersion: $(train.modelVersion)
-                    isDev: true
 
   - stage: Test
     dependsOn: Dev
@@ -59,8 +57,6 @@ stages:
     jobs:
       - deployment: test
         environment: LuckData-Snowflake-MLOps-test
-        variables:
-          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.train.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
@@ -70,18 +66,14 @@ stages:
                   parameters:
                     env: test
                     db: TEST_ML_DB
-                    previousDb: DEV_ML_DB
                     serviceConnection: $(serviceConnectionTest)
-                    modelVersion: $(modelVersion)
 
   - stage: Prod
-    dependsOn: [Dev, Test]
+    dependsOn: Test
     condition: succeeded()
     jobs:
       - deployment: prod
         environment: LuckData-Snowflake-MLOps-prod
-        variables:
-          modelVersion: $[ stageDependencies.Dev.dev.outputs['dev.train.modelVersion'] ]
         strategy:
           runOnce:
             deploy:
@@ -91,6 +83,4 @@ stages:
                   parameters:
                     env: prod
                     db: PROD_ML_DB
-                    previousDb: TEST_ML_DB
                     serviceConnection: $(serviceConnectionProd)
-                    modelVersion: $(modelVersion)
