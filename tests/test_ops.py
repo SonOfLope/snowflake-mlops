@@ -102,6 +102,22 @@ def test_forecast_job_writes_only_the_months_ahead(monkeypatch, feature_frame):
     assert rows["MONTH"].min() > feature_frame["MONTH"].max()
 
 
+def test_forecast_with_no_model_yet_writes_nothing(monkeypatch, capsys):
+    import json
+
+    from jobs import forecast as job
+    from luckml import forecast, registry, session
+
+    written = []
+    monkeypatch.setattr(session, "connect", lambda cfg: FakeSession())
+    monkeypatch.setattr(registry, "default_version", lambda s, cfg: None)
+    monkeypatch.setattr(forecast, "write", lambda *a, **k: written.append(a))
+    assert job.main(["--env", "prod", "--run-id", "m1"]) == 0
+    assert written == []
+    last = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert last["version"] is None and last["rows"] == 0
+
+
 def test_gate_writes_its_run_log_row_even_when_it_fails():
     s = FakeSession(rows={"EXECUTE IMMEDIATE": [("FAIL V9 wape 0.25 against the default V8 wape 0.19, beyond the tolerance",)]})
     with pytest.raises(RuntimeError):

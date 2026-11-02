@@ -22,6 +22,9 @@ def main(argv=None) -> int:
     cfg = config.load(a.env)
     s = session.connect(cfg)
     version = a.version or registry.default_version(s, cfg)
+    if version is None:
+        print(json.dumps({"version": None, "rows": 0, "note": "no model in this environment yet, nothing to forecast"}))
+        return 0
     mv = registry.get_version(s, cfg, version)
     rows = forecast.predict_horizon(mv, data.load_feature_frame(s, cfg), cfg.horizon_months)
     n = forecast.write(s, cfg, rows, version, a.run_id)
