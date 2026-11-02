@@ -1,6 +1,10 @@
--- One monitor per promoted version, over a view of that version's rows. Variables: db, version, wh.
+-- One monitor per promoted version, over a view of that version's rows, with the version's training rows as the baseline
+-- for drift. Variables: db, version, wh.
 CREATE OR REPLACE VIEW <% db %>.WORKSPACE.FORECAST_<% version %> AS
   SELECT * FROM <% db %>.WORKSPACE.FORECAST_SITE_MONTH WHERE MODEL_VERSION = '<% version %>';
+
+CREATE OR REPLACE VIEW <% db %>.WORKSPACE.BASELINE_<% version %> AS
+  SELECT * FROM <% db %>.WORKSPACE.BASELINE_SITE_MONTH WHERE MODEL_VERSION = '<% version %>';
 
 CREATE MODEL MONITOR IF NOT EXISTS <% db %>.MODELS.SITE_TONNES_FORECAST_<% version %>_MON
 WITH
@@ -8,6 +12,7 @@ WITH
   VERSION = <% version %>
   FUNCTION = predict
   SOURCE = <% db %>.WORKSPACE.FORECAST_<% version %>
+  BASELINE = <% db %>.WORKSPACE.BASELINE_<% version %>
   WAREHOUSE = <% wh %>
   REFRESH_INTERVAL = '1 day'
   AGGREGATION_WINDOW = '30 days'

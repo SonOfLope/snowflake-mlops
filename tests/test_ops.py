@@ -53,14 +53,21 @@ def test_gate_failure_raises_with_the_numbers():
 
 
 def test_promote_stops_when_verify_finds_no_rows():
-    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 0, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
+    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 0, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1, "BASELINE_ROWS": 144}]})
     with pytest.raises(RuntimeError):
         ops.promote(s, config.load("dev"), "V9", "run9")
     assert not any("SET DEFAULT_VERSION" in t for t in s.statements)
 
 
+def test_promote_stops_when_the_version_has_no_baseline_rows():
+    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1, "BASELINE_ROWS": 0}]})
+    with pytest.raises(RuntimeError):
+        ops.promote(s, config.load("dev"), "V9", "run9")
+    assert not any("CREATE MODEL MONITOR" in t for t in s.statements)
+
+
 def test_promote_monitors_then_sets_the_default_and_skips_retire_when_disabled():
-    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
+    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1, "BASELINE_ROWS": 144}]})
     ops.promote(s, config.load("dev"), "V9", "run9")
     monitor = next(i for i, t in enumerate(s.statements) if "CREATE MODEL MONITOR" in t)
     default = next(i for i, t in enumerate(s.statements) if "SET DEFAULT_VERSION = V9" in t)
@@ -102,6 +109,22 @@ def test_forecast_job_writes_only_the_months_ahead(monkeypatch, feature_frame):
     assert rows["MONTH"].min() > feature_frame["MONTH"].max()
 
 
+def test_forecast_with_no_model_yet_writes_nothing(monkeypatch, capsys):
+    import json
+
+    from jobs import forecast as job
+    from luckml import forecast, registry, session
+
+    written = []
+    monkeypatch.setattr(session, "connect", lambda cfg: FakeSession())
+    monkeypatch.setattr(registry, "default_version", lambda s, cfg: None)
+    monkeypatch.setattr(forecast, "write", lambda *a, **k: written.append(a))
+    assert job.main(["--env", "prod", "--run-id", "m1"]) == 0
+    assert written == []
+    last = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert last["version"] is None and last["rows"] == 0
+
+
 def test_gate_writes_its_run_log_row_even_when_it_fails():
     s = FakeSession(rows={"EXECUTE IMMEDIATE": [("FAIL V9 wape 0.25 against the default V8 wape 0.19, beyond the tolerance",)]})
     with pytest.raises(RuntimeError):
@@ -111,7 +134,7 @@ def test_gate_writes_its_run_log_row_even_when_it_fails():
 
 
 def test_promote_writes_its_run_log_row():
-    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
+    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1, "BASELINE_ROWS": 144}]})
     ops.promote(s, config.load("dev"), "V9", "run9")
     logged = [p for t, p in zip(s.statements, s.params) if "insert into DEV_ML_DB.WORKSPACE.RUN_LOG" in t]
     assert len(logged) == 1 and logged[0][:4] == ["run9", "promote", "V9", True]

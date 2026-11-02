@@ -41,16 +41,16 @@ def test_predict_horizon_rolls_lags(feature_frame):
     assert (out["SITE_ID"] == 202).sum() == 0
 
 
-def test_backfill_frame_scores_holdout(feature_frame):
+def test_scored_frame_scores_holdout(feature_frame):
     holdout = feature_frame[(feature_frame["SITE_ID"] == 101)].tail(3)
-    out = forecast.backfill_frame(FakeVersion(), holdout)
+    out = forecast.scored_frame(FakeVersion(), holdout)
     assert list(out["ACTUAL_TONNES"]) == [150.0, 160.0, 170.0]
     assert list(out["FORECAST_TONNES"]) == list(holdout["LAG_1"])
 
 
-def test_backfill_frame_scores_holdout_with_a_fitted_model(feature_frame):
+def test_scored_frame_scores_holdout_with_a_fitted_model(feature_frame):
     holdout = feature_frame[(feature_frame["SITE_ID"] == 101)].tail(3)
-    out = forecast.backfill_frame(FakeModel(), holdout)
+    out = forecast.scored_frame(FakeModel(), holdout)
     assert list(out["FORECAST_TONNES"]) == [2 * v for v in holdout["LAG_1"]]
     assert list(out["ACTUAL_TONNES"]) == [150.0, 160.0, 170.0]
 
@@ -68,3 +68,12 @@ def test_write_is_idempotent(feature_frame):
     staged = s.frames[0][1]
     assert staged.loc[staged["MONTH"] == "2026-09-01", "ROW_ID"].iloc[0] == "101-2026-09"
     assert set(staged["MODEL_VERSION"]) == {"V9"}
+
+
+def test_write_targets_the_given_table(feature_frame):
+    cfg = config.load("dev")
+    rows = forecast.predict_horizon(FakeVersion(), feature_frame, 3)
+    s = FakeSession()
+    forecast.write(s, cfg, rows, "V9", "run9", table="BASELINE_SITE_MONTH")
+    merge = next(q for q in s.sqls if q.lstrip().upper().startswith("MERGE"))
+    assert "MERGE INTO DEV_ML_DB.WORKSPACE.BASELINE_SITE_MONTH" in merge.upper()

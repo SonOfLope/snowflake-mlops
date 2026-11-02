@@ -67,11 +67,28 @@ def test_train_writes_the_held_out_rows_from_the_fit_without_them(monkeypatch):
     monkeypatch.setattr(registry, "version_exists", lambda s, cfg, v: False)
     monkeypatch.setattr(registry, "log", lambda *a, **k: None)
     monkeypatch.setattr(train, "write_run_log", lambda *a, **k: None)
-    monkeypatch.setattr(train.forecast, "write", lambda s, cfg, rows, v, r: written.append((rows, v, r)) or len(rows))
+    monkeypatch.setattr(train.forecast, "write", lambda s, cfg, rows, v, r, **k: written.append((rows, v, r, k)) or len(rows))
     real_fit = train.model.fit
     monkeypatch.setattr(train.model, "fit", lambda frame: fits.append(real_fit(frame)) or fits[-1])
     assert train.main(["--env", "dev", "--version", "VTEST", "--run-id", "t1"]) == 0
-    rows, version, run_id = written[0]
+    rows, version, run_id, _ = written[0]
     assert (version, run_id, len(rows)) == ("VTEST", "t1", 6)
     assert list(rows["ACTUAL_TONNES"]) == [1009.0, 1010.0, 1011.0] * 2
     assert list(rows["FORECAST_TONNES"]) == list(fits[0].predict(rows[FEATURE_COLUMNS]))   # the fit that never saw these months
+
+
+def test_train_writes_the_training_rows_scored_by_the_refit_as_the_versions_baseline(monkeypatch):
+    fits, written = [], []
+    monkeypatch.setattr(session, "connect", lambda cfg: object())
+    monkeypatch.setattr(data, "load_feature_frame", lambda s, cfg: _good_frame())
+    monkeypatch.setattr(registry, "version_exists", lambda s, cfg, v: False)
+    monkeypatch.setattr(registry, "log", lambda *a, **k: None)
+    monkeypatch.setattr(train, "write_run_log", lambda *a, **k: None)
+    monkeypatch.setattr(train.forecast, "write", lambda s, cfg, rows, v, r, **k: written.append((rows, v, k)) or len(rows))
+    real_fit = train.model.fit
+    monkeypatch.setattr(train.model, "fit", lambda frame: fits.append(real_fit(frame)) or fits[-1])
+    assert train.main(["--env", "dev", "--version", "VTEST", "--run-id", "t1"]) == 0
+    rows, version, _ = next(w for w in written if w[2].get("table") == "BASELINE_SITE_MONTH")
+    assert version == "VTEST" and len(rows) == 24
+    assert list(rows["FORECAST_TONNES"]) == list(fits[1].predict(rows[FEATURE_COLUMNS]))   # the refit, what the version will produce
+    assert list(rows["ACTUAL_TONNES"]) == list(_good_frame()["TONNES"])
