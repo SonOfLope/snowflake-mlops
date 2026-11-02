@@ -175,3 +175,8 @@ def test_data_expectations_are_declared_scheduled_and_checked_before_training():
     cycle = (root / "sources" / "definitions" / "cycle.sql").read_text()
     assert "SITE_TONNES_MONTHLY_CHECK_DATA" in cycle and "TEST ALL" in cycle
     assert "DEFINE TASK {{ db }}.SALES_FORECASTING.SITE_TONNES_MONTHLY_TRAIN\n  AFTER {{ db }}.SALES_FORECASTING.SITE_TONNES_MONTHLY_CHECK_DATA" in cycle
+
+
+def test_the_deployment_alias_is_unique_per_attempt_so_a_rerun_can_deploy():
+    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
+    assert 'snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber).$(System.JobAttempt)"' in template

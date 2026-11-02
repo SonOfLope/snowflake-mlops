@@ -33,7 +33,7 @@ steps:
         cd dcm
         snow dcm create "${CONN[@]}" --target ${{ parameters.env }} --if-not-exists
         snow dcm plan "${CONN[@]}" --target ${{ parameters.env }}
-        snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber)"
+        snow dcm deploy "${CONN[@]}" --target ${{ parameters.env }} --alias "$(Build.BuildNumber).$(System.JobAttempt)"
   - template: snow-step.yml
     parameters:
       displayName: Data expectations (${{ parameters.env }})
