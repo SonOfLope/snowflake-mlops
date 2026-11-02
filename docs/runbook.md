@@ -35,10 +35,6 @@ The same code trained on test data produced a challenger worse than test's defau
 
 Then run again: the pipeline from `main`, or the graph by executing its root task, `EXECUTE TASK <ENV>_ML_DB.WORKSPACE.MONTHLY_START`, as a role that owns it. Until the alert exists, nobody is told when a graph task fails; check Task History after the third of the month.
 
-## The monitor shows drift
-
-Each drift chart on a version's Monitoring tab has one point per 30-day window, the distance between that window's values and the version's training rows. A point well above the previous ones means the month's inputs or predictions differ from what the version was trained on. Check in order: the count charts (a site missing from the source changes every distance), the data expectations on `SRC_SITE_MONTH` for that month, then the same month a year earlier on the same chart, since a seasonal change is not drift. If the difference holds for two windows, train a challenger before the monthly cycle does, with a run queued with `retrainProd` set; the regression gate decides whether it replaces the default.
-
 ## Roll the default back
 
 `ALTER MODEL <ENV>_ML_DB.MODELS.SITE_TONNES_FORECAST SET DEFAULT_VERSION = <previous>;` as the environment's deployer, through the pipeline or an administrator. The previous version's forecast rows and monitor are still there, since the retire step keeps the newest versions.

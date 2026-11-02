@@ -49,7 +49,7 @@ A metric becomes blocking only when the business decides a release should stop o
 
 ## Monitoring
 
-Each promoted version has a model monitor in `MODELS`, on the model's Monitoring tab in Snowsight. It refreshes daily from the version's rows (`FORECAST_V<n>`) and shows, per 30-day window, the number of forecasts and of actuals, the accuracy metrics for the months with actuals, and drift, the distance between the window's inputs and predictions and the version's baseline, the rows it was trained on (`BASELINE_V<n>`). Drift is computed as soon as the forecast rows exist, the accuracy metrics once the actuals are loaded. Drift is read relative to the previous windows, not as an absolute value, since monthly tonnes are seasonal and the distance varies through the year. Versions promoted before the baseline table existed have no baseline rows and no drift metrics.
+Each promoted version has a model monitor in `MODELS`, on the model's Monitoring tab in Snowsight. It refreshes daily from the version's rows (`FORECAST_V<n>`) and shows, per 30-day window, the number of forecasts and of actuals, the accuracy metrics for the months with actuals, and drift, the distance between the window's inputs and predictions and the version's baseline, the rows it was trained on (`BASELINE_V<n>`). Drift is computed as soon as the forecast rows exist, the accuracy metrics once the actuals are loaded. Versions promoted before the baseline table existed have no baseline rows and no drift metrics.
 
 ## Layout
 
