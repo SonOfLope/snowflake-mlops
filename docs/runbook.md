@@ -37,7 +37,7 @@ Then run again: the pipeline from `main`, or the graph by executing its root tas
 
 ## The monitor shows drift
 
-Each drift chart on a version's Monitoring tab has one point per 30-day window, the distance between that window's values and the version's training rows; drift is a point well above the ones before it. It is computed the day the forecast is written, so it is the first chart to react when a month looks unlike training. In order: the count charts (a site missing from the source moves every distance), the data expectations on `SRC_SITE_MONTH` for that month, then the same month a year earlier on the same chart, since tonnes are seasonal and a yearly movement is not drift. A departure that holds for two windows is a reason to train a challenger before the monthly cycle does, a run queued with `retrainProd` set; the regression gate decides whether it replaces the default.
+Each drift chart on a version's Monitoring tab has one point per 30-day window, the distance between that window's values and the version's training rows. A point well above the previous ones means the month's inputs or predictions differ from what the version was trained on. Check in order: the count charts (a site missing from the source changes every distance), the data expectations on `SRC_SITE_MONTH` for that month, then the same month a year earlier on the same chart, since a seasonal change is not drift. If the difference holds for two windows, train a challenger before the monthly cycle does, with a run queued with `retrainProd` set; the regression gate decides whether it replaces the default.
 
 ## Roll the default back
 
