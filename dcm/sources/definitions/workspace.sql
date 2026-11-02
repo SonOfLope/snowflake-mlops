@@ -22,10 +22,12 @@ DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG (
   STAGE VARCHAR,
   MODEL_VERSION VARCHAR,
   MAPE NUMBER(9,4),
+  WAPE NUMBER(9,4),
+  METRICS VARIANT,
   GATE_PASSED BOOLEAN,
   JOB_ID VARCHAR,
   RUN_AT TIMESTAMP_NTZ
-) COMMENT = 'One row per pipeline step that trained or forecast.';
+) COMMENT = 'One row per training or forecast run; METRICS holds every held-out metric of a training run.';
 
 DEFINE STAGE {{ db }}.WORKSPACE.JOB_RESULTS
   COMMENT = 'Result stage of the LUCKML code bundle; the jobs write their output to tables.';

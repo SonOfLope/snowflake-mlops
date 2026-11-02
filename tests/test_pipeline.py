@@ -103,3 +103,10 @@ def test_the_monthly_cycle_is_a_task_graph_started_only_in_prod():
         assert f"DEFINE TASK {{{{ db }}}}.WORKSPACE.{after}\n  AFTER {{{{ db }}}}.WORKSPACE.{before}" in sql
     assert "MONTHLY_FORECAST_DEFAULT\n  AFTER {{ db }}.WORKSPACE.MONTHLY_START" in sql
     assert sql.count("CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP") == 5
+
+
+def test_run_log_keeps_every_metric():
+    definitions = (PIPELINE.parent / "dcm" / "sources" / "definitions" / "workspace.sql").read_text()
+    run_log = definitions[definitions.index("DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG"):]
+    run_log = run_log[: run_log.index(";")]
+    assert "WAPE NUMBER(9,4)" in run_log and "METRICS VARIANT" in run_log

@@ -8,12 +8,28 @@ The monthly site tonnes forecast as code on Snowflake. A small Python package tr
 
 1. **Experiment in dev.** An AI engineer works directly in `DEV_ML_DB` as `FR_AI_ENGINEER`, from a Workspace notebook or an IDE, and logs as many versions as the work needs. Nothing here touches `main`.
 2. **Pull request.** The candidate's code goes on a branch. The branch policy runs the `Validate` stage: `ruff`, `pytest`, `snow dcm plan` and `snow feature plan` against dev, signed in as `SVC_MLOPS_DEV`.
-3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects, the code bundle and the monthly task graph (DCM) and the feature views, then runs four jobs on `ML_CPU_POOL`: **train** a challenger `V<build>` on dev data (held-out MAPE under `gate_mape_max`, else nothing is logged), **forecast** with it, **gate** it against dev's current default on the months with actuals, **promote** it (verify, monitor, make it the default, retire old versions when enabled).
+3. **Main, dev.** The merge runs `Validate` again, then the `Dev` stage deploys the schema objects, the code bundle and the monthly task graph (DCM) and the feature views, then runs four jobs on `ML_CPU_POOL`: **train** a challenger `V<build>` on dev data (held-out weighted error under `gate_wape_max`, else nothing is logged), **forecast** with it, **gate** it against dev's current default on the months with actuals, **promote** it (verify, monitor, make it the default, retire old versions when enabled).
 4. **Test.** The same steps on `TEST_ML_DB` with test data. Test proves the reviewed code trains, forecasts and passes the gates on a second dataset.
 5. **Prod.** After the approval on the `LuckData-Snowflake-MLOps-prod` environment, the same steps on `PROD_ML_DB` with production data. The default version in prod is what production code calls; it moves only when a challenger passes the regression gate there.
 6. **Every month, in prod.** The task graph `PROD_ML_DB.WORKSPACE.MONTHLY_CYCLE` forecasts the next months with the current default, then trains a challenger `M<yyyymmddhhmi>` on the latest data, forecasts, gates and promotes it with the same jobs. A challenger that loses leaves the champion in place. The graph is declared in every environment and started only in prod.
 
 `docs/architecture.md` walks the diagram journey by journey.
+
+## Metrics
+
+Every training run scores the challenger on the held-out months, on rows with a positive actual, and stores the result with the version in the registry and in `RUN_LOG.METRICS`. Two numbers block, the rest inform.
+
+| Metric | Definition | Role |
+|---|---|---|
+| `wape` | sum of absolute errors over sum of actual tonnes | the gate metric: under `gate_wape_max` to be logged, within `regression_tolerance` of the default's to be promoted |
+| `mape` | mean of per-row percentage errors | reported; a small site with a large miss dominates it, which is why it does not gate |
+| `bias` | sum of signed errors over sum of actuals; positive means over-forecast | reported |
+| `median_ape`, `p90_ape` | the middle and the worst tenth of the per-row errors | reported |
+| `rmse` | root mean squared error, in tonnes | reported |
+| `stockout_rate`, `excess_rate` | share of rows under-forecast, or over-forecast, by more than 20 percent | reported |
+| `persistence_wape`, `seasonal_naive_wape` | the error of the trailing three-month average and of the same month last year, on the same rows | reported; a model that does not beat them is not earning its keep |
+
+A metric becomes blocking only when the business decides a release should stop on it; until then it is a number people read, and an alert can watch.
 
 ## Layout
 

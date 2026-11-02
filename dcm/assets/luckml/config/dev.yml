@@ -7,7 +7,7 @@ role: RBAC_ML_DEPLOYER_DEV
 model_name: SITE_TONNES_FORECAST
 feature_view: SITE_MONTHLY_TONNES
 feature_view_version: "1"
-gate_mape_max: 0.35
+gate_wape_max: 0.4
 regression_tolerance: 0.10
 horizon_months: 3
 eval_months: 3

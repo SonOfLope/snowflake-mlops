@@ -18,7 +18,7 @@ class Config:
     model_name: str
     feature_view: str
     feature_view_version: str
-    gate_mape_max: float
+    gate_wape_max: float
     regression_tolerance: float
     retire_enabled: bool
     retain_versions: int

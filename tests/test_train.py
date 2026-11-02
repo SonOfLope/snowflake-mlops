@@ -29,5 +29,5 @@ def test_train_main_fails_gate_without_logging(monkeypatch, capsys):
     rc = train.main(["--env", "dev", "--version", "VTEST", "--run-id", "t1"])
     last = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert rc == 1
-    assert last["gate"] is False and last["version"] == "VTEST"
+    assert last["gate"] is False and last["version"] == "VTEST" and "wape" in last
     assert calls == []

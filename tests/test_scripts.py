@@ -25,3 +25,9 @@ def test_regression_gate_compares_the_candidate_with_the_default_and_raises():
     assert "<% tolerance %>" in sql
     assert re.search(r"RAISE \w+;", sql)
     assert "no default to compare" in sql
+
+
+def test_regression_gate_compares_weighted_errors():
+    sql = (SCRIPTS / "regression.sql").read_text()
+    assert sql.count("SUM(ABS(") == 2 and "AVG(ABS(" not in sql
+    assert "wape" in sql

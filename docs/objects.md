@@ -9,7 +9,7 @@ What exists in each environment's ML database, who creates it, and what it holds
 | `MLOPS` | DCM project | `snow dcm create` | the deployment history of everything DCM declares |
 | `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH` |
 | `FORECAST_SITE_MONTH` | table | DCM, filled by the forecast job | one row per site, month and model version |
-| `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run |
+| `RUN_LOG` | table | DCM, filled by the jobs | one row per training or forecast run; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the two job entry points and the config |
 | `FORECAST_V<n>` | view | `sql/monitor.sql` in the bundle | the rows of version `V<n>` only, the source of its monitor |
 | `MONTHLY_CYCLE` | task graph | DCM | the monthly cycle: `MONTHLY_START`, `MONTHLY_FORECAST_DEFAULT`, `MONTHLY_TRAIN`, `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`; started in prod only |
@@ -21,8 +21,8 @@ from PROD_ML_DB.WORKSPACE.FORECAST_SITE_MONTH where MODEL_VERSION = 'V118' order
 -- 101 | 2026-07-01 | 25589.1 | 29699.7 | V118   held-out month, actual known
 -- 101 | 2026-10-01 | 22537.9 |    null | V118   month ahead, actual written when the month closes
 
-select RUN_ID, STAGE, MODEL_VERSION, MAPE, GATE_PASSED, JOB_ID from PROD_ML_DB.WORKSPACE.RUN_LOG order by RUN_AT desc limit 2;
--- 118 | forecast | V118 | null   | true | PROD_ML_DB.WORKSPACE.FORECAST_...
+select RUN_ID, STAGE, MODEL_VERSION, WAPE, METRICS:bias::float as BIAS, GATE_PASSED from PROD_ML_DB.WORKSPACE.RUN_LOG
+where STAGE = 'train' order by RUN_AT desc limit 1;
 ```
 
 ## FEATURES
