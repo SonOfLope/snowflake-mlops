@@ -26,7 +26,7 @@ assets:
 templating:
   defaults:
     wh: ML_WH
-    cycle_schedule: USING CRON 0 6 3 * * America/New_York
+    cycle_schedule: USING CRON 0 6 3 * * America/New_York   # after the previous month has closed in the source; confirm with the data team
     cycle_state: SUSPENDED
   configurations:
     dev:

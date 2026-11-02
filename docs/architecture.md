@@ -39,7 +39,7 @@ Code moves, models do not. Test (C1) and prod (C2) receive the reviewed code bun
 3. `MONTHLY_TRAIN`, after the root: a challenger `M<yyyymmddhhmi>` trained on the latest data, the same name in every task of the run.
 4. `MONTHLY_FORECAST_CHALLENGER`, `MONTHLY_GATE`, `MONTHLY_PROMOTE`, in that order, the same jobs the pipeline runs.
 
-A failing task stops the tasks after it; the champion stays the default. Task history is in Snowsight under Monitoring, Task History, and in `RUN_LOG`.
+A failing task stops the tasks after it; the champion stays the default. The schedule assumes the previous month is complete in `<ENV>_DB.ODS.FCT_SITE_MONTH` by then; confirm the close date with the data team and move `cycle_schedule` if needed. The actuals refresh is idempotent, so a month that closes late is picked up by the next run. Task history is in Snowsight under Monitoring, Task History, and in `RUN_LOG`.
 
 ## D1, the data
 

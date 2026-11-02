@@ -1,4 +1,6 @@
-"""Train, evaluate, gate and log one model version. Runs inside a Snowflake ML Job."""
+"""Train, evaluate, gate and log one model version. Runs inside a Snowflake ML Job.
+
+The score comes from a fit without the held-out months; the version logged is refitted on the full history."""
 
 import argparse
 import json
@@ -39,7 +41,7 @@ def main(argv=None) -> int:
     passed = model.gate(metrics, cfg)
     write_run_log(s, cfg, a.run_id, "train", a.version, metrics, passed)
     if passed:
-        registry.log(s, cfg, m, a.version, metrics, train)
+        registry.log(s, cfg, model.fit(frame), a.version, metrics, frame)
     print(json.dumps({"version": a.version, "gate": passed, **metrics}))
     return 0 if passed else 1
 
