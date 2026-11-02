@@ -53,22 +53,15 @@ select * from table(MODEL_MONITOR_PERFORMANCE_METRIC(
 
 ## Growth and cleanup
 
-Each pipeline run adds, per environment, a model version, a `FORECAST_V<n>` view, a monitor, and one set of forecast rows for that version. Nothing removes them automatically.
+Each pipeline run adds, per environment, a model version, a `FORECAST_V<n>` view, a monitor, and one set of forecast rows for that version.
 
-Retire a version only when it is neither the environment's default nor the one before it, so a rollback stays possible. Check the default first:
+The pipeline retires old versions as its last step in each environment, as `SVC_MLOPS_<ENV>`, the owner of these objects. Two settings in `dcm/assets/luckml/config/<env>.yml` control it:
 
-```sql
-show versions in model PROD_ML_DB.MODELS.SITE_TONNES_FORECAST;   -- is_default_version
+```yaml
+retire_enabled: false    # true to retire; false logs "nothing retired"
+retain_versions: 50      # versions kept besides the default
 ```
 
-Then, as `RBAC_ML_DEPLOYER_<ENV>`, in this order:
+When enabled, `scripts/retire.sql` keeps the default and the newest `retain_versions` other versions, and for every older one drops its monitor, then its view, then the version. The forecast rows stay as history. A rerun drops nothing more, and a monitor or view already removed is skipped. The run log prints `retired: V92 V93` or `retired: none`.
 
-```sql
-drop model monitor PROD_ML_DB.MODELS.SITE_TONNES_FORECAST_V92_MON;
-drop view PROD_ML_DB.WORKSPACE.FORECAST_V92;
-alter model PROD_ML_DB.MODELS.SITE_TONNES_FORECAST drop version V92;
--- optional: the rows are history and cost little to keep
-delete from PROD_ML_DB.WORKSPACE.FORECAST_SITE_MONTH where MODEL_VERSION = 'V92';
-```
-
-The monitor reads the view, so it goes first. A version that is the default cannot be dropped.
+`RBAC_ML_DEPLOYER_<ENV>` is held by no person; an administrator can act with it through `SYSADMIN` to repair an environment, not as the way to clean up.

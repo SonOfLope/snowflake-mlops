@@ -111,3 +111,13 @@ steps:
       role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
       script: |
         snow sql "${CONN[@]}" --filename scripts/set_default.sql -D db=${{ parameters.db }} -D version=${{ parameters.modelVersion }}
+  - template: snow-step.yml
+    parameters:
+      displayName: Retire old versions (${{ parameters.env }})
+      serviceConnection: ${{ parameters.serviceConnection }}
+      user: SVC_MLOPS_${{ upper(parameters.env) }}
+      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
+      script: |
+        read -r enabled keep < <(python -c "import yaml; c = yaml.safe_load(open('dcm/assets/luckml/config/${{ parameters.env }}.yml')); print(str(c['retire_enabled']).lower(), c['retain_versions'])")
+        if [ "$enabled" != "true" ]; then echo "retire_enabled is false in config/${{ parameters.env }}.yml, nothing retired"; exit 0; fi
+        snow sql "${CONN[@]}" --filename scripts/retire.sql -D db=${{ parameters.db }} -D keep=$keep
