@@ -10,11 +10,13 @@ SQL = Path(__file__).resolve().parents[1] / "dcm" / "assets" / "luckml" / "sql"
 class FakeSession:
     def __init__(self, rows=None, fail_on=None):
         self.statements = []
+        self.params = []
         self.rows = rows or {}
         self.fail_on = fail_on
 
     def sql(self, text, params=None):
         self.statements.append(text)
+        self.params.append(params)
         if self.fail_on and self.fail_on in text:
             raise RuntimeError("the candidate is worse than the default version beyond the tolerance")
         self._last = text
@@ -42,26 +44,26 @@ def test_every_bundle_script_renders_without_leftover_variables():
 
 def test_gate_refreshes_actuals_then_compares_with_the_configured_tolerance():
     s = FakeSession()
-    ops.gate(s, config.load("dev"), "V9")
+    ops.gate(s, config.load("dev"), "V9", "run9")
     assert "UPDATE DEV_ML_DB.WORKSPACE.FORECAST_SITE_MONTH" in s.statements[0]
     assert any("1 + 0.1" in t for t in s.statements)
 
 
 def test_gate_failure_raises():
     with pytest.raises(RuntimeError):
-        ops.gate(FakeSession(fail_on="RAISE"), config.load("dev"), "V9")
+        ops.gate(FakeSession(fail_on="RAISE"), config.load("dev"), "V9", "run9")
 
 
 def test_promote_stops_when_verify_finds_no_rows():
     s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 0, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
     with pytest.raises(RuntimeError):
-        ops.promote(s, config.load("dev"), "V9")
+        ops.promote(s, config.load("dev"), "V9", "run9")
     assert not any("SET DEFAULT_VERSION" in t for t in s.statements)
 
 
 def test_promote_monitors_then_sets_the_default_and_skips_retire_when_disabled():
     s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
-    ops.promote(s, config.load("dev"), "V9")
+    ops.promote(s, config.load("dev"), "V9", "run9")
     monitor = next(i for i, t in enumerate(s.statements) if "CREATE MODEL MONITOR" in t)
     default = next(i for i, t in enumerate(s.statements) if "SET DEFAULT_VERSION = V9" in t)
     assert monitor < default
@@ -85,3 +87,18 @@ def test_forecast_without_a_version_uses_the_default(monkeypatch):
     monkeypatch.setattr(forecast, "write", lambda s, cfg, rows, v, r: seen.setdefault("written", v) and 0)
     assert job.main(["--env", "dev", "--run-id", "m1"]) == 0
     assert seen == {"v": "V7", "written": "V7"}
+
+
+def test_gate_writes_its_run_log_row_even_when_it_fails():
+    s = FakeSession(fail_on="RAISE")
+    with pytest.raises(RuntimeError):
+        ops.gate(s, config.load("dev"), "V9", "run9")
+    logged = [p for t, p in zip(s.statements, s.params) if "insert into DEV_ML_DB.WORKSPACE.RUN_LOG" in t]
+    assert len(logged) == 1 and logged[0][:4] == ["run9", "gate", "V9", False]
+
+
+def test_promote_writes_its_run_log_row():
+    s = FakeSession(rows={"forecast_rows": [{"FORECAST_ROWS": 48, "NULL_FORECASTS": 0, "VERSION_PRESENT": 1}]})
+    ops.promote(s, config.load("dev"), "V9", "run9")
+    logged = [p for t, p in zip(s.statements, s.params) if "insert into DEV_ML_DB.WORKSPACE.RUN_LOG" in t]
+    assert len(logged) == 1 and logged[0][:4] == ["run9", "promote", "V9", True]

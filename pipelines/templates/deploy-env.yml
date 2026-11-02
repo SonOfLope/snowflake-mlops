@@ -50,7 +50,7 @@ steps:
         script: |
           rc=0
           snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=train -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=train 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=train 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
           exit $rc
     - template: snow-step.yml
       parameters:
@@ -61,7 +61,7 @@ steps:
         script: |
           rc=0
           snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=forecast -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=forecast 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=forecast 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
           exit $rc
     - template: snow-step.yml
       parameters:
@@ -73,7 +73,7 @@ steps:
         script: |
           rc=0
           snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=gate -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=gate 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=gate 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
           exit $rc
     - template: snow-step.yml
       parameters:
@@ -84,5 +84,5 @@ steps:
         script: |
           rc=0
           snow sql "${CONN[@]}" --database ${{ parameters.db }} --schema WORKSPACE --filename scripts/run_job.sql -D db=${{ parameters.db }} -D job=promote -D env=${{ parameters.env }} -D version=V$(Build.BuildId) -D run_id=$(Build.BuildId) || rc=$?
-          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=promote 2>/dev/null | python3 -c "import json, sys; print(*(r['LINE'] for r in json.load(sys.stdin)), sep=chr(10))" 2>/dev/null || echo "job output not readable"
+          snow sql "${CONN[@]}" --format json --filename scripts/job_output.sql -D db=${{ parameters.db }} -D job=promote 2>/dev/null | python3 -c "import json, sys; out = json.load(sys.stdin); rows = out[-1] if out and isinstance(out[-1], list) else out; print(*(r['LINE'] for r in rows), sep=chr(10))" 2>/dev/null || echo "job output not readable"
           exit $rc
