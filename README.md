@@ -34,7 +34,7 @@ img/                           the lifecycle, quality gates and sign-in diagrams
 ## Local run
 
 ```bash
-python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 snow connection add                      # a connection for your user, role FR_AI_ENGINEER
 export SNOWFLAKE_CONNECTION_NAME=<name>
 export SNOWFLAKE_CLI_FEATURES_ENABLE_FEATURE_STORE=true
@@ -74,11 +74,10 @@ This repository carries the pattern on a deliberately small model. The productio
 
 ## Versions
 
-`requirements.in` holds the floors, `requirements.txt` the exact versions resolved from them. To move to the latest usable set, resolve again and let `Validate` prove it:
+`requirements.in` holds the floors, `requirements.txt` the exact versions resolved from them, for the pipeline agent and local work. The jobs themselves run on the Snowflake ML runtime pinned by `runtime_version` in `dcm/assets/luckml/code_bundle.yml`. To move to the latest usable set, resolve again and let `Validate` prove it:
 
 ```bash
 uv pip compile --upgrade --python-version 3.12 requirements.in -o requirements.txt
-uv pip compile --upgrade --python-version 3.12 requirements-dev.in -o requirements-dev.txt
 ```
 
 `lightgbm` is pinned to the version the Snowflake container runtime ships, so a model logged inside a job is the same library locally.

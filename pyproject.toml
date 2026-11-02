@@ -7,14 +7,11 @@ name = "luckml"
 version = "0.1.0"
 description = "Monthly site tonnes forecast, trained and promoted on Snowflake"
 requires-python = ">=3.12,<3.13"
-dynamic = ["dependencies"]
 
 [tool.setuptools]
 package-dir = {"" = "dcm/assets/luckml"}
 packages = ["luckml"]
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

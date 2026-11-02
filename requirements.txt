@@ -72,6 +72,8 @@ idna==3.20
     #   yarl
 importlib-resources==6.5.2
     # via snowflake-ml-python
+iniconfig==2.3.1
+    # via pytest
 jaraco-classes==3.4.0
     # via keyring
 jaraco-context==6.1.2
@@ -127,6 +129,7 @@ numpy==2.5.4
     #   snowflake-ml-python
 packaging==25.0
     # via
+    #   pytest
     #   requirements-parser
     #   snowflake-cli
     #   snowflake-connector-python
@@ -143,7 +146,9 @@ platformdirs==4.13.5
     #   snowflake-connector-python
     #   snowflake-ml-python
 pluggy==1.6.0
-    # via snowflake-cli
+    # via
+    #   pytest
+    #   snowflake-cli
 prompt-toolkit==3.0.51
     # via snowflake-cli
 propcache==0.5.4
@@ -168,13 +173,17 @@ pydantic==2.12.5
 pydantic-core==2.41.5
     # via pydantic
 pygments==2.21.0
-    # via rich
+    # via
+    #   pytest
+    #   rich
 pyjwt==2.15.1
     # via
     #   snowflake-connector-python
     #   snowflake-ml-python
 pyopenssl==26.4.0
     # via snowflake-connector-python
+pytest==9.2.0
+    # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via
     #   botocore
@@ -210,6 +219,8 @@ rich==14.0.0
     # via
     #   snowflake-cli
     #   typer
+ruff==0.17.3
+    # via -r requirements.in
 s3transfer==0.19.3
     # via boto3
 scikit-learn==1.9.1
