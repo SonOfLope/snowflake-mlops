@@ -1,9 +1,11 @@
+import itertools
 import re
 from pathlib import Path
 
 import yaml
 
 PIPELINE = Path(__file__).resolve().parents[1] / "azure-pipelines.yml"
+BUNDLE = PIPELINE.parent / "dcm" / "assets" / "luckml"
 STAGE_REF = re.compile(r"stageDependencies\.(\w+)\.")
 
 
@@ -33,21 +35,18 @@ def test_step_display_names_carry_no_runtime_variable():
         assert "$(" not in name and "modelVersion" not in name, name
 
 
-def test_every_environment_sets_the_default_after_the_gate_and_the_verify():
+def test_every_environment_trains_its_own_challenger_then_forecasts_gates_and_promotes():
     text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
-    names = re.findall(r"displayName:\s*(.+)", text)
-    gate = next(i for i, n in enumerate(names) if n.startswith("Actuals and regression gate"))
-    verify = next(i for i, n in enumerate(names) if n.startswith("Verify and monitor"))
-    default = next(i for i, n in enumerate(names) if n.startswith("Set the default version"))
-    assert gate < verify < default
-    block = text[text.index("Set the default version") - 400 : text.index("Set the default version")]
-    assert "isProd" not in block
+    names = [n.split(" (")[0] for n in re.findall(r"displayName:\s*(.+)", text)]
+    assert names[-4:] == ["Train", "Forecast", "Regression gate", "Promote"]
+    assert "${{ if" not in text and "previousDb" not in text and "modelVersion" not in text
+    assert "promote.sql" not in text
 
 
-def test_the_regression_tolerance_comes_from_the_environment_configuration():
-    text = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
-    assert "regressionTolerance" not in text
-    assert "regression_tolerance" in text
+def test_no_stage_reads_another_stages_model():
+    stages = {s["stage"]: s for s in _stages()}
+    assert "stageDependencies" not in yaml.safe_dump(stages["Test"]) + yaml.safe_dump(stages["Prod"])
+    assert _depends_on(stages["Prod"]) == ["Test"]
 
 
 def test_jobs_run_as_the_code_bundle_declared_by_dcm():
@@ -59,7 +58,7 @@ def test_jobs_run_as_the_code_bundle_declared_by_dcm():
     assert re.search(r"DEFINE CODE BUNDLE \{\{ db \}\}\.WORKSPACE\.LUCKML\s+FROM 'asset://luckml/'", definitions)
     template = (root / "pipelines" / "templates" / "deploy-env.yml").read_text()
     assert "luckml.submit" not in template and "snow stage copy" not in template
-    assert template.count("scripts/run_job.sql") == 2
+    assert template.count("scripts/run_job.sql") == 4
     sql = (root / "scripts" / "run_job.sql").read_text()
     assert "EXECUTE CODE BUNDLE <% db %>.WORKSPACE.LUCKML" in sql
     assert "CODE_BUNDLE_HISTORY" in sql
@@ -76,21 +75,38 @@ def test_the_bundle_pins_its_runtime_and_writes_results_to_job_results():
 
 def test_job_steps_print_the_jobs_own_output_even_when_the_job_fails():
     template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
-    assert template.count("scripts/job_output.sql") == 2
+    assert template.count("scripts/job_output.sql") == 4
     sql = (PIPELINE.parent / "scripts" / "job_output.sql").read_text()
-    assert "CODE_BUNDLE_HISTORY" in sql and "RECORD_TYPE = 'LOG'" in sql
+    assert "CODE_BUNDLE_HISTORY" in sql and "RECORD_TYPE = 'LOG'" in sql and "TELEMETRY.EVENTS_VIEW" in sql
 
 
 def test_retirement_is_configured_per_environment_and_starts_disabled():
     for env in ("dev", "test", "prod"):
-        cfg = yaml.safe_load((PIPELINE.parent / "dcm" / "assets" / "luckml" / "config" / f"{env}.yml").read_text())
+        cfg = yaml.safe_load((BUNDLE / "config" / f"{env}.yml").read_text())
         assert cfg["retire_enabled"] is False
         assert cfg["retain_versions"] == 50
-    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
-    names = re.findall(r"displayName:\s*(.+)", template)
-    assert names[-1].startswith("Retire old versions")
-    assert "scripts/retire.sql" in template and "retire_enabled" in template
-    sql = (PIPELINE.parent / "scripts" / "retire.sql").read_text()
+    sql = (BUNDLE / "sql" / "retire.sql").read_text()
     assert "DROP MODEL MONITOR IF EXISTS" in sql and "DROP VIEW IF EXISTS" in sql
     assert sql.index("DROP MODEL MONITOR") < sql.index("DROP VIEW") < sql.index("DROP VERSION")
     assert "is_default_version" in sql and "<% keep %>" in sql
+
+
+def test_the_monthly_cycle_is_a_task_graph_started_only_in_prod():
+    manifest = yaml.safe_load((PIPELINE.parent / "dcm" / "manifest.yml").read_text())["templating"]
+    assert manifest["defaults"]["cycle_state"] == "SUSPENDED"
+    assert manifest["configurations"]["prod"]["cycle_state"] == "STARTED"
+    assert "cycle_state" not in manifest["configurations"]["dev"] and "cycle_state" not in manifest["configurations"]["test"]
+    sql = (PIPELINE.parent / "dcm" / "sources" / "definitions" / "cycle.sql").read_text()
+    assert "DEFINE TASK GRAPH {{ db }}.WORKSPACE.MONTHLY_CYCLE" in sql and "{{ cycle_state }}" in sql
+    order = ["MONTHLY_TRAIN", "MONTHLY_FORECAST_CHALLENGER", "MONTHLY_GATE", "MONTHLY_PROMOTE"]
+    for before, after in itertools.pairwise(order):
+        assert f"DEFINE TASK {{{{ db }}}}.WORKSPACE.{after}\n  AFTER {{{{ db }}}}.WORKSPACE.{before}" in sql
+    assert "MONTHLY_FORECAST_DEFAULT\n  AFTER {{ db }}.WORKSPACE.MONTHLY_START" in sql
+    assert sql.count("CURRENT_TASK_GRAPH_ORIGINAL_SCHEDULED_TIMESTAMP") == 5
+
+
+def test_run_log_keeps_every_metric():
+    definitions = (PIPELINE.parent / "dcm" / "sources" / "definitions" / "workspace.sql").read_text()
+    run_log = definitions[definitions.index("DEFINE TABLE {{ db }}.WORKSPACE.RUN_LOG"):]
+    run_log = run_log[: run_log.index(";")]
+    assert "WAPE NUMBER(9,4)" in run_log and "METRICS VARIANT" in run_log

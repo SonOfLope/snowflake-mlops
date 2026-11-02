@@ -1,6 +1,6 @@
--- Prints the log of the last execution of one job of the code bundle, from the account event table. Variables: db, job.
+-- Prints the log of the last execution of one job of the code bundle, through the governed events view. Variables: db, job.
 SELECT e.VALUE::STRING AS LINE
-FROM SNOWFLAKE.TELEMETRY.EVENTS e
+FROM SNOWFLAKE.TELEMETRY.EVENTS_VIEW e
 JOIN (
   SELECT SPLIT_PART(RUNTIME_NAME, '.', 3) AS SERVICE
   FROM TABLE(SNOWFLAKE.INFORMATION_SCHEMA.CODE_BUNDLE_HISTORY())

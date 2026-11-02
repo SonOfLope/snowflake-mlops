@@ -7,7 +7,7 @@ def test_load_dev_config():
     cfg = config.load("dev")
     assert cfg.database == "DEV_ML_DB"
     assert cfg.role == "RBAC_ML_DEPLOYER_DEV"
-    assert cfg.gate_mape_max == 0.35
+    assert cfg.gate_wape_max == 0.4
     assert cfg.regression_tolerance == 0.10
 
 

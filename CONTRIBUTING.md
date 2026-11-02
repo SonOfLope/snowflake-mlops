@@ -15,7 +15,7 @@ Work happens on a branch, in a Snowsight Workspace opened from this repository, 
 3. Run `pytest -q` and `ruff check .` in the Workspace terminal or locally.
 4. Commit and push the branch from the Workspace.
 5. Open the pull request in Azure DevOps. The branch policy runs `Validate`: lint, tests, `snow dcm plan` and `snow feature plan` against dev. Read the plans in the run before asking for review.
-6. After the merge the pipeline trains in dev, promotes to test, and to prod after the approval.
+6. After the merge the pipeline trains, gates and promotes in dev, then test, then prod after the approval, each on its own data. From then on prod retrains every month on its own.
 
 ## Rules
 

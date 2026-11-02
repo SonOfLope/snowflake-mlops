@@ -26,13 +26,19 @@ assets:
 templating:
   defaults:
     wh: ML_WH
+    cycle_schedule: USING CRON 0 6 3 * * America/New_York
+    cycle_state: SUSPENDED
   configurations:
     dev:
       db: DEV_ML_DB
+      env: dev
       src_db: DEV_DB
     test:
       db: TEST_ML_DB
+      env: test
       src_db: TEST_DB
     prod:
       db: PROD_ML_DB
+      env: prod
+      cycle_state: STARTED
       src_db: PROD_DB

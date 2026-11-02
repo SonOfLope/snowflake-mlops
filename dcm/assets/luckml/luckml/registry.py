@@ -18,7 +18,7 @@ def log(session, cfg: Config, m, version: str, metrics: dict, sample: pd.DataFra
         m,
         model_name=cfg.model_name,
         version_name=version,
-        metrics=metrics,
+        metrics={k: v for k, v in metrics.items() if v is not None},
         sample_input_data=sample[FEATURE_COLUMNS].head(10),
         task=type_hints.Task.TABULAR_REGRESSION,
         conda_dependencies=[f"lightgbm=={lightgbm.__version__}"],
@@ -36,3 +36,7 @@ def version_exists(session, cfg: Config, version: str) -> bool:
 
 def get_version(session, cfg: Config, version: str):
     return open(session, cfg).get_model(cfg.model_name).version(version)
+
+
+def default_version(session, cfg: Config) -> str:
+    return open(session, cfg).get_model(cfg.model_name).default.version_name
