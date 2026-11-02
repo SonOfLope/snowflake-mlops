@@ -88,7 +88,7 @@ def test_retirement_is_configured_per_environment_and_starts_disabled():
     sql = (BUNDLE / "sql" / "retire.sql").read_text()
     assert "DROP MODEL MONITOR IF EXISTS" in sql and "DROP VIEW IF EXISTS" in sql
     assert sql.index("DROP MODEL MONITOR") < sql.index("DROP VIEW") < sql.index("DROP VERSION")
-    assert "WORKSPACE.BASELINE_' || r.v" in sql and sql.index("BASELINE_' || r.v") < sql.index("DROP VERSION")
+    assert "DROP TABLE IF EXISTS <% db %>.WORKSPACE.BASELINE_' || r.v" in sql and sql.index("BASELINE_' || r.v") < sql.index("DROP VERSION")
     assert "is_default_version" in sql and "<% keep %>" in sql
 
 
