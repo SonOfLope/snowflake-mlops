@@ -15,16 +15,6 @@ steps:
   - template: tools.yml
   - template: snow-step.yml
     parameters:
-      displayName: Move the forecast tables, one release (${{ parameters.env }})
-      retry: 0
-      serviceConnection: ${{ parameters.serviceConnection }}
-      user: SVC_MLOPS_${{ upper(parameters.env) }}
-      role: RBAC_ML_DEPLOYER_${{ upper(parameters.env) }}
-      script: |
-        out=$(snow sql "${CONN[@]}" --format json --filename scripts/move_tables.sql -D db=${{ parameters.db }})
-        echo "$out" | python3 -c "import json, sys; out = json.load(sys.stdin); row = out[-1] if isinstance(out[-1], dict) else out[-1][0]; line = next(iter(row.values())); print(line); raise SystemExit(1 if str(line).startswith('FAIL') else 0)"
-  - template: snow-step.yml
-    parameters:
       displayName: DCM plan and deploy (${{ parameters.env }})
       serviceConnection: ${{ parameters.serviceConnection }}
       user: SVC_MLOPS_${{ upper(parameters.env) }}

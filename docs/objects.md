@@ -10,7 +10,7 @@ What exists in each environment's ML database, who creates it, and what it holds
 | `SRC_SITE_MONTH` | view | DCM | monthly tonnes per site, read from `<ENV>_DB.ODS.FCT_SITE_MONTH`; carries the data expectations on the source |
 | `RUN_LOG` | table | DCM, filled by the jobs | one row per job run of any model, `MODEL` names it; a training row carries `WAPE`, `MAPE` and every metric in `METRICS` |
 | `LUCKML` | code bundle | DCM, from `dcm/assets/luckml` | the package, the job entry points and the config |
-| `FORECAST_SITE_MONTH`, `BASELINE_SITE_MONTH` | views | `scripts/move_tables.sql`, once | the old names of the two tables now in `SALES_FORECASTING`, read by the monitors of the versions promoted before the move; drop them with the last of those versions |
+| `FORECAST_SITE_MONTH`, `BASELINE_SITE_MONTH` | views | the move to `SALES_FORECASTING`, once | the old names of the two tables now in `SALES_FORECASTING`, read by the monitors of the versions promoted before the move; drop them with the last of those versions |
 | `FORECAST_V<n>`, `BASELINE_V<n>` | views | `sql/monitor.sql`, before the move | the per-version views of those same versions; the retire step drops them |
 | `JOB_RESULTS` | stage | DCM | the code bundle's result stage: one folder per job run, `LUCKML/<JOB>_<id>/`, holding the entry point's result (a few bytes); the jobs write their output to the tables, nothing reads this stage, purge it freely |
 | `IMAGES` | image repository | `LuckData-IaC-Snowflake-Horizon` | container images for a model served as a service; empty, the jobs run on Snowflake's ML runtime image |

@@ -106,16 +106,6 @@ def test_the_baseline_table_mirrors_the_forecast_table_so_the_monitor_can_compar
     assert forecast[-1] == "MODEL"    # appended last, so the tables moved from WORKSPACE can be altered into shape
 
 
-def test_the_move_runs_once_before_the_deploy_and_keeps_the_old_names_for_earlier_monitors():
-    template = (PIPELINE.parent / "pipelines" / "templates" / "deploy-env.yml").read_text()
-    assert template.index("scripts/move_tables.sql") < template.index("snow dcm deploy")
-    sql = (PIPELINE.parent / "scripts" / "move_tables.sql").read_text()
-    assert "SYSTEM$UNMANAGE_FROM_DCM_PROJECT" in sql and "RENAME TO" not in sql   # a table cannot leave a managed access schema by rename
-    for old, new in (("FORECAST_SITE_MONTH", "SITE_MONTH_FORECAST"), ("BASELINE_SITE_MONTH", "SITE_MONTH_BASELINE")):
-        copy = f"CREATE TABLE <% db %>.SALES_FORECASTING.{new} AS SELECT * FROM <% db %>.WORKSPACE.{old}"
-        assert copy in sql and sql.index(copy) < sql.index(f"DROP TABLE <% db %>.WORKSPACE.{old}") < sql.index(f"CREATE VIEW <% db %>.WORKSPACE.{old}")
-
-
 def test_every_environment_names_the_family_schema():
     for env in ("dev", "test", "prod"):
         cfg = yaml.safe_load((BUNDLE / "config" / f"{env}.yml").read_text())
